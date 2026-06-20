@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using FiscalFlow.Application.Messaging;
 using FiscalFlow.Infrastructure.RabbitMq;
@@ -135,21 +136,219 @@ public sealed class FiscalDocumentReceivedConsumer :
         }
         catch (Exception exception)
         {
+            await HandleProcessingFailureAsync(
+                channel,
+                eventArgs,
+                exception);
+        }
+    }
+
+    private async Task HandleProcessingFailureAsync(
+        IChannel channel,
+        BasicDeliverEventArgs eventArgs,
+        Exception exception)
+    {
+        var retryCount =
+            GetRetryCount(
+                eventArgs.BasicProperties.Headers);
+
+        if (retryCount >=
+            _options.MaxRetryAttempts)
+        {
+            await PublishToDeadLetterQueueAsync(
+                channel,
+                eventArgs,
+                exception,
+                retryCount);
+
+            await channel.BasicAckAsync(
+                deliveryTag: eventArgs.DeliveryTag,
+                multiple: false,
+                cancellationToken:
+                    eventArgs.CancellationToken);
+
             _logger.LogError(
                 exception,
                 """
-                Falha ao processar mensagem RabbitMQ.
-                DeliveryTag: {DeliveryTag}
+                Mensagem enviada para a Dead Letter Queue.
+                MessageId: {MessageId}
+                RetryCount: {RetryCount}
+                QueueName: {QueueName}
                 """,
-                eventArgs.DeliveryTag);
+                eventArgs.BasicProperties.MessageId,
+                retryCount,
+                _options.DeadLetterQueueName);
 
-            await channel.BasicNackAsync(
-                deliveryTag: eventArgs.DeliveryTag,
-                multiple: false,
-                requeue: false,
-                cancellationToken:
-                    eventArgs.CancellationToken);
+            return;
         }
+
+        var nextRetryAttempt =
+            retryCount + 1;
+
+        _logger.LogWarning(
+            exception,
+            """
+            Falha ao processar mensagem RabbitMQ.
+            A mensagem será enviada para retry.
+            MessageId: {MessageId}
+            RetryAttempt: {RetryAttempt}
+            MaxRetryAttempts: {MaxRetryAttempts}
+            """,
+            eventArgs.BasicProperties.MessageId,
+            nextRetryAttempt,
+            _options.MaxRetryAttempts);
+
+        await channel.BasicNackAsync(
+            deliveryTag: eventArgs.DeliveryTag,
+            multiple: false,
+            requeue: false,
+            cancellationToken:
+                eventArgs.CancellationToken);
+    }
+
+    private async Task PublishToDeadLetterQueueAsync(
+        IChannel channel,
+        BasicDeliverEventArgs eventArgs,
+        Exception exception,
+        long retryCount)
+    {
+        var properties =
+            new BasicProperties(
+                eventArgs.BasicProperties);
+
+        properties.Headers =
+            eventArgs.BasicProperties.Headers is null
+                ? new Dictionary<string, object?>()
+                : new Dictionary<string, object?>(
+                    eventArgs.BasicProperties.Headers);
+
+        properties.Headers["x-retry-count"] =
+            retryCount;
+
+        properties.Headers["x-processing-attempt-count"] =
+            retryCount + 1;
+
+        properties.Headers["x-final-error-type"] =
+            exception.GetType().FullName
+            ?? exception.GetType().Name;
+
+        properties.Headers["x-final-error-message"] =
+            exception.Message;
+
+        await channel.BasicPublishAsync(
+            exchange:
+                _options.DeadLetterExchangeName,
+            routingKey:
+                _options.DeadLetterRoutingKey,
+            mandatory: true,
+            basicProperties: properties,
+            body: eventArgs.Body,
+            cancellationToken:
+                eventArgs.CancellationToken);
+    }
+
+    private long GetRetryCount(
+        IDictionary<string, object?>? headers)
+    {
+        if (headers is null
+            || !headers.TryGetValue(
+                "x-death",
+                out var rawDeaths)
+            || rawDeaths is not
+                IEnumerable<object?> deaths)
+        {
+            return 0;
+        }
+
+        foreach (var rawDeath in deaths)
+        {
+            if (rawDeath is not
+                IDictionary<string, object?> death)
+            {
+                continue;
+            }
+
+            var queue =
+                ReadAmqpString(
+                    GetValue(death, "queue"));
+
+            var reason =
+                ReadAmqpString(
+                    GetValue(death, "reason"));
+
+            if (!string.Equals(
+                    queue,
+                    _options.QueueName,
+                    StringComparison.Ordinal)
+                || !string.Equals(
+                    reason,
+                    "rejected",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return ReadAmqpCount(
+                GetValue(death, "count"));
+        }
+
+        return 0;
+    }
+
+    private static object? GetValue(
+        IDictionary<string, object?> values,
+        string key)
+    {
+        return values.TryGetValue(
+            key,
+            out var value)
+                ? value
+                : null;
+    }
+
+    private static string? ReadAmqpString(
+        object? value)
+    {
+        return value switch
+        {
+            string text => text,
+
+            byte[] bytes =>
+                Encoding.UTF8.GetString(bytes),
+
+            ReadOnlyMemory<byte> memory =>
+                Encoding.UTF8.GetString(
+                    memory.Span),
+
+            ArraySegment<byte> segment =>
+                Encoding.UTF8.GetString(
+                    segment.Array!,
+                    segment.Offset,
+                    segment.Count),
+
+            _ => null
+        };
+    }
+
+    private static long ReadAmqpCount(
+        object? value)
+    {
+        return value switch
+        {
+            byte number => number,
+            sbyte number => number,
+            short number => number,
+            ushort number => number,
+            int number => number,
+            uint number => number,
+            long number => number,
+
+            ulong number
+                when number <= long.MaxValue =>
+                    (long)number,
+
+            _ => 0
+        };
     }
 
     public override async Task StopAsync(
