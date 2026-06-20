@@ -14,15 +14,79 @@ public sealed class FiscalDocument
         string tenantId,
         string externalDocumentId,
         DateTimeOffset? receivedAtUtc = null)
+        : this(
+            Guid.NewGuid(),
+            tenantId,
+            externalDocumentId,
+            DocumentProcessingStatus.Received,
+            receivedAtUtc ?? DateTimeOffset.UtcNow,
+            null,
+            null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(externalDocumentId);
+    }
 
-        Id = Guid.NewGuid();
+    private FiscalDocument(
+        Guid id,
+        string tenantId,
+        string externalDocumentId,
+        DocumentProcessingStatus status,
+        DateTimeOffset receivedAtUtc,
+        DateTimeOffset? processedAtUtc,
+        string? failureReason)
+    {
+        if (id == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "O ID do documento não pode ser vazio.",
+                nameof(id));
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            externalDocumentId);
+
+        if (status == DocumentProcessingStatus.Processed
+            && processedAtUtc is null)
+        {
+            throw new ArgumentException(
+                "Um documento processado precisa ter uma data de processamento.",
+                nameof(processedAtUtc));
+        }
+
+        if (status == DocumentProcessingStatus.Failed
+            && string.IsNullOrWhiteSpace(failureReason))
+        {
+            throw new ArgumentException(
+                "Um documento com falha precisa ter um motivo.",
+                nameof(failureReason));
+        }
+
+        Id = id;
         TenantId = tenantId.Trim();
         ExternalDocumentId = externalDocumentId.Trim();
-        Status = DocumentProcessingStatus.Received;
-        ReceivedAtUtc = receivedAtUtc ?? DateTimeOffset.UtcNow;
+        Status = status;
+        ReceivedAtUtc = receivedAtUtc;
+        ProcessedAtUtc = processedAtUtc;
+        FailureReason = failureReason?.Trim();
+    }
+
+    public static FiscalDocument Rehydrate(
+        Guid id,
+        string tenantId,
+        string externalDocumentId,
+        DocumentProcessingStatus status,
+        DateTimeOffset receivedAtUtc,
+        DateTimeOffset? processedAtUtc,
+        string? failureReason)
+    {
+        return new FiscalDocument(
+            id,
+            tenantId,
+            externalDocumentId,
+            status,
+            receivedAtUtc,
+            processedAtUtc,
+            failureReason);
     }
 
     public void MarkAsProcessing()
@@ -39,7 +103,8 @@ public sealed class FiscalDocument
         FailureReason = null;
     }
 
-    public void MarkAsProcessed(DateTimeOffset? processedAtUtc = null)
+    public void MarkAsProcessed(
+        DateTimeOffset? processedAtUtc = null)
     {
         if (Status != DocumentProcessingStatus.Processing)
         {
@@ -48,7 +113,9 @@ public sealed class FiscalDocument
         }
 
         Status = DocumentProcessingStatus.Processed;
-        ProcessedAtUtc = processedAtUtc ?? DateTimeOffset.UtcNow;
+        ProcessedAtUtc =
+            processedAtUtc ?? DateTimeOffset.UtcNow;
+
         FailureReason = null;
     }
 
