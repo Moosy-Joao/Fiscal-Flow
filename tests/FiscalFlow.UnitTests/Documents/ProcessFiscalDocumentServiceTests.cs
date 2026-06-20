@@ -117,17 +117,17 @@ public sealed class ProcessFiscalDocumentServiceTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_ShouldResume_WhenAlreadyProcessing()
+    public async Task ExecuteAsync_ShouldIgnore_WhenAlreadyProcessing()
     {
         var repository = new FakeFiscalDocumentRepository();
-        var parser = new FiscalDocumentXmlParser();
+        var parser = new CountingXmlParser();
         var service = new ProcessFiscalDocumentService(
             repository,
             parser);
 
         var document = new FiscalDocument(
             "empresa-demo",
-            "NFE-RETOMADA",
+            "NFE-EM-PROCESSAMENTO",
             xmlContent: ValidXml);
 
         document.MarkAsProcessing();
@@ -139,11 +139,12 @@ public sealed class ProcessFiscalDocumentServiceTests
                 document.TenantId));
 
         Assert.Equal(
-            DocumentProcessingStatus.Processed,
+            DocumentProcessingStatus.Processing,
             document.Status);
-        Assert.NotNull(document.ProcessedAtUtc);
+        Assert.Equal(0, parser.CallCount);
+        Assert.Null(document.ProcessedAtUtc);
         Assert.Null(document.FailureReason);
-        Assert.NotNull(document.FiscalData);
+        Assert.Null(document.FiscalData);
     }
 
     [Fact]
