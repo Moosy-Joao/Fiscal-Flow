@@ -1,5 +1,6 @@
 using FiscalFlow.Api.Contracts;
 using FiscalFlow.Application.Documents;
+using FiscalFlow.Domain.Documents;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FiscalFlow.Api.Controllers;
@@ -15,12 +16,17 @@ public sealed class FiscalDocumentsController
     private readonly GetFiscalDocumentByIdService
         _getByIdService;
 
+    private readonly UpdateFiscalDocumentStatusService
+    _updateStatusService;
+
     public FiscalDocumentsController(
-        CreateFiscalDocumentService createService,
-        GetFiscalDocumentByIdService getByIdService)
+    CreateFiscalDocumentService createService,
+    GetFiscalDocumentByIdService getByIdService,
+    UpdateFiscalDocumentStatusService updateStatusService)
     {
         _createService = createService;
         _getByIdService = getByIdService;
+        _updateStatusService = updateStatusService;
     }
 
     [HttpPost]
@@ -67,5 +73,74 @@ public sealed class FiscalDocumentsController
         }
 
         return Ok(result);
+    }
+
+    [HttpPatch("{id:guid}/status")]
+    [ProducesResponseType(
+    typeof(FiscalDocumentDetails),
+    StatusCodes.Status200OK)]
+    [ProducesResponseType(
+    StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(
+    StatusCodes.Status404NotFound)]
+    [ProducesResponseType(
+    StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateStatus(
+    Guid id,
+    UpdateFiscalDocumentStatusRequest request,
+    CancellationToken cancellationToken)
+    {
+        if (!Enum.TryParse<DocumentProcessingStatus>(
+            request.Status,
+            ignoreCase: true,
+            out var status)
+            || !Enum.IsDefined(
+                typeof(DocumentProcessingStatus),
+                status))
+        {
+            ModelState.AddModelError(
+                nameof(request.Status),
+                "Status inválido. Use Processing, Processed ou Failed.");
+
+            return ValidationProblem(ModelState);
+        }
+
+        var command =
+            new UpdateFiscalDocumentStatusCommand(
+                id,
+                status,
+                request.FailureReason);
+
+        try
+        {
+            var result =
+                await _updateStatusService.ExecuteAsync(
+                    command,
+                    cancellationToken);
+
+            if (result is null)
+            {
+                return NotFound();
+            }
+
+            return Ok(result);
+        }
+        catch (ArgumentException exception)
+        {
+            ModelState.AddModelError(
+                "request",
+                exception.Message);
+
+            return ValidationProblem(ModelState);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Conflict(new ProblemDetails
+            {
+                Title = "Transição de status inválida",
+                Detail = exception.Message,
+                Status = StatusCodes.Status409Conflict
+            });
+        }
     }
 }

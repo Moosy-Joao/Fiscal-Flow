@@ -11,4 +11,12 @@ public interface IFiscalDocumentRepository
     Task<FiscalDocumentDetails?> FindByIdAsync(
         Guid id,
         CancellationToken cancellationToken = default);
+
+    Task<FiscalDocument?> FindDomainByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
+    Task UpdateAsync(
+        FiscalDocument document,
+        CancellationToken cancellationToken = default);
 }

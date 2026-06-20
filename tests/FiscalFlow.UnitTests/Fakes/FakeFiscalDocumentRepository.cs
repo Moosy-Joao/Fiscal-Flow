@@ -42,4 +42,32 @@ internal sealed class FakeFiscalDocumentRepository
         return Task.FromResult<
             FiscalDocumentDetails?>(details);
     }
+
+    public Task<FiscalDocument?> FindDomainByIdAsync(
+    Guid id,
+    CancellationToken cancellationToken = default)
+    {
+        var document = Documents.SingleOrDefault(
+            item => item.Id == id);
+
+        return Task.FromResult(document);
+    }
+
+    public Task UpdateAsync(
+        FiscalDocument document,
+        CancellationToken cancellationToken = default)
+    {
+        var index = Documents.FindIndex(
+            item => item.Id == document.Id);
+
+        if (index < 0)
+        {
+            throw new InvalidOperationException(
+                "Documento não encontrado.");
+        }
+
+        Documents[index] = document;
+
+        return Task.CompletedTask;
+    }
 }
