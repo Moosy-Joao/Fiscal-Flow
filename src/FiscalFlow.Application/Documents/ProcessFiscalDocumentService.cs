@@ -59,11 +59,16 @@ public sealed class ProcessFiscalDocumentService
             return;
         }
 
-        document.MarkAsProcessing();
+        if (document.Status is
+            DocumentProcessingStatus.Received
+            or DocumentProcessingStatus.Failed)
+        {
+            document.MarkAsProcessing();
 
-        await _repository.UpdateAsync(
-            document,
-            cancellationToken);
+            await _repository.UpdateAsync(
+                document,
+                cancellationToken);
+        }
 
         try
         {
@@ -74,7 +79,8 @@ public sealed class ProcessFiscalDocumentService
                     "O documento fiscal não possui conteúdo XML.");
             }
 
-            _xmlParser.Parse(document.XmlContent);
+            _xmlParser.Parse(
+                document.XmlContent);
 
             document.MarkAsProcessed();
 

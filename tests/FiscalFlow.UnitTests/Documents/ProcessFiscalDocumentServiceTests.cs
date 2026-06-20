@@ -115,4 +115,43 @@ public sealed class ProcessFiscalDocumentServiceTests
         Assert.Null(
             document.ProcessedAtUtc);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldResume_WhenAlreadyProcessing()
+    {
+        var repository =
+            new FakeFiscalDocumentRepository();
+
+        var parser =
+            new FiscalDocumentXmlParser();
+
+        var service =
+            new ProcessFiscalDocumentService(
+                repository,
+                parser);
+
+        var document =
+            new FiscalDocument(
+                "empresa-demo",
+                "NFE-RETOMADA",
+                xmlContent: ValidXml);
+
+        document.MarkAsProcessing();
+
+        await repository.InsertAsync(document);
+
+        var command =
+            new ProcessFiscalDocumentCommand(
+                document.Id,
+                document.TenantId);
+
+        await service.ExecuteAsync(command);
+
+        Assert.Equal(
+            DocumentProcessingStatus.Processed,
+            document.Status);
+
+        Assert.NotNull(document.ProcessedAtUtc);
+        Assert.Null(document.FailureReason);
+    }
 }

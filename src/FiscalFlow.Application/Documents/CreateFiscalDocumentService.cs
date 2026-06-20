@@ -26,6 +26,11 @@ public sealed class CreateFiscalDocumentService
         CreateFiscalDocumentCommand command,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(command);
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            command.TenantId);
+
         ArgumentException.ThrowIfNullOrWhiteSpace(
     command.TenantId);
 
