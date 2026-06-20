@@ -1,0 +1,29 @@
+services:
+  mongo:
+    image: mongo:8
+    ports:
+      - "27017:27017"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  fiscalflow-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - mongo
+      - rabbitmq
+    ports:
+      - "8080:8080"
+    environment:
+      Mongo__ConnectionString: mongodb://mongo:27017
+      Mongo__DatabaseName: fiscalflow
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: guest
+      RabbitMq__Password: guest
+      RabbitMq__QueueName: fiscalflow.documents
