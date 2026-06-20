@@ -37,7 +37,7 @@ http://localhost:5298/api/health
 ## MongoDB local
 
 ```bash
-docker compose up -d mongodb
+docker compose -f docker-compose.learning.yml up -d
 ```
 
 O MongoDB ainda não está conectado à API. Essa será a próxima etapa prática.
