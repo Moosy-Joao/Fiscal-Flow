@@ -10,6 +10,8 @@ public sealed class FiscalDocument
 
     public string? XmlContent { get; }
 
+    public FiscalDocumentData? FiscalData { get; private set; }
+
     public DocumentProcessingStatus Status
     {
         get;
@@ -43,7 +45,8 @@ public sealed class FiscalDocument
             receivedAtUtc ?? DateTimeOffset.UtcNow,
             null,
             null,
-            xmlContent)
+            xmlContent,
+            null)
     {
     }
 
@@ -55,7 +58,8 @@ public sealed class FiscalDocument
         DateTimeOffset receivedAtUtc,
         DateTimeOffset? processedAtUtc,
         string? failureReason,
-        string? xmlContent)
+        string? xmlContent,
+        FiscalDocumentData? fiscalData)
     {
         if (id == Guid.Empty)
         {
@@ -98,6 +102,7 @@ public sealed class FiscalDocument
                 ? null
                 : xmlContent.Trim();
 
+        FiscalData = fiscalData;
         Status = status;
         ReceivedAtUtc = receivedAtUtc;
         ProcessedAtUtc = processedAtUtc;
@@ -114,7 +119,8 @@ public sealed class FiscalDocument
         DateTimeOffset receivedAtUtc,
         DateTimeOffset? processedAtUtc,
         string? failureReason,
-        string? xmlContent = null)
+        string? xmlContent = null,
+        FiscalDocumentData? fiscalData = null)
     {
         return new FiscalDocument(
             id,
@@ -124,7 +130,8 @@ public sealed class FiscalDocument
             receivedAtUtc,
             processedAtUtc,
             failureReason,
-            xmlContent);
+            xmlContent,
+            fiscalData);
     }
 
     public void MarkAsProcessing()
@@ -142,6 +149,31 @@ public sealed class FiscalDocument
             DocumentProcessingStatus.Processing;
 
         ProcessedAtUtc = null;
+        FailureReason = null;
+        FiscalData = null;
+    }
+
+    public void CompleteProcessing(
+        FiscalDocumentData fiscalData,
+        DateTimeOffset? processedAtUtc = null)
+    {
+        ArgumentNullException.ThrowIfNull(fiscalData);
+
+        if (Status !=
+            DocumentProcessingStatus.Processing)
+        {
+            throw new InvalidOperationException(
+                "O documento precisa estar em processamento antes de ser concluído.");
+        }
+
+        FiscalData = fiscalData;
+        Status =
+            DocumentProcessingStatus.Processed;
+
+        ProcessedAtUtc =
+            processedAtUtc
+            ?? DateTimeOffset.UtcNow;
+
         FailureReason = null;
     }
 
@@ -182,5 +214,6 @@ public sealed class FiscalDocument
 
         ProcessedAtUtc = null;
         FailureReason = reason.Trim();
+        FiscalData = null;
     }
 }
