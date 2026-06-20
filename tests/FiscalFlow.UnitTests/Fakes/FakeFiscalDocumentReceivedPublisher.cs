@@ -10,11 +10,22 @@ public sealed class FakeFiscalDocumentReceivedPublisher :
         get;
     } = [];
 
+    public int PublishAttempts { get; private set; }
+
+    public Exception? ExceptionToThrow { get; set; }
+
     public Task PublishAsync(
         FiscalDocumentReceivedMessage message,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
+
+        PublishAttempts++;
+
+        if (ExceptionToThrow is not null)
+        {
+            throw ExceptionToThrow;
+        }
 
         Messages.Add(message);
 
