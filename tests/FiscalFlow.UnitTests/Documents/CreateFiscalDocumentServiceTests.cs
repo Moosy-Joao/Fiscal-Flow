@@ -41,4 +41,24 @@ public sealed class CreateFiscalDocumentServiceTests
         Assert.Equal(savedDocument.Id, result.Id);
         Assert.Equal("Received", result.Status);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldRejectDuplicateDocument()
+    {
+        var repository =
+            new FakeFiscalDocumentRepository();
+
+        var service =
+            new CreateFiscalDocumentService(repository);
+
+        var command = new CreateFiscalDocumentCommand(
+            "empresa-demo",
+            "NFE-DUPLICADA");
+
+        await service.ExecuteAsync(command);
+
+        await Assert.ThrowsAsync<
+            DuplicateFiscalDocumentException>(
+            () => service.ExecuteAsync(command));
+    }
 }

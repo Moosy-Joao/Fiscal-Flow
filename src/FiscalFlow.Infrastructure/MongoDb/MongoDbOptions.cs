@@ -7,4 +7,6 @@ public sealed class MongoDbOptions
     public string ConnectionString { get; init; } = string.Empty;
 
     public string DatabaseName { get; init; } = string.Empty;
+
+    public bool InitializeIndexes { get; init; }
 }

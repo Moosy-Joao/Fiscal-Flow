@@ -23,16 +23,28 @@ public sealed class FiscalDocumentRepository
     }
 
     public async Task InsertAsync(
-        FiscalDocument document,
-        CancellationToken cancellationToken = default)
+    FiscalDocument document,
+    CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(document);
 
         var mongoModel = MapToMongoModel(document);
 
-        await _collection.InsertOneAsync(
-            mongoModel,
-            cancellationToken: cancellationToken);
+        try
+        {
+            await _collection.InsertOneAsync(
+                mongoModel,
+                cancellationToken: cancellationToken);
+        }
+        catch (MongoWriteException exception)
+            when (exception.WriteError.Category
+                  == ServerErrorCategory.DuplicateKey)
+        {
+            throw new DuplicateFiscalDocumentException(
+                document.TenantId,
+                document.ExternalDocumentId,
+                exception);
+        }
     }
 
     public async Task<FiscalDocumentDetails?> FindByIdAsync(

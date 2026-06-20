@@ -25,6 +25,9 @@ builder.Services.AddSingleton(mongoDbOptions);
 builder.Services.AddSingleton<MongoDbContext>();
 
 builder.Services.AddSingleton<
+    FiscalDocumentIndexManager>();
+
+builder.Services.AddSingleton<
     IFiscalDocumentRepository,
     FiscalDocumentRepository>();
 
@@ -41,6 +44,15 @@ builder.Services.AddScoped<
     ListFiscalDocumentsService>();
 
 var app = builder.Build();
+
+if (mongoDbOptions.InitializeIndexes)
+{
+    var indexManager =
+        app.Services.GetRequiredService<
+            FiscalDocumentIndexManager>();
+
+    await indexManager.EnsureCreatedAsync();
+}
 
 if (app.Environment.IsDevelopment())
 {
