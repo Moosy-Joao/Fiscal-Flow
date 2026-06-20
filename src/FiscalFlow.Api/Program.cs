@@ -1,7 +1,26 @@
+using FiscalFlow.Infrastructure.MongoDb;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+
+var mongoDbOptions = builder.Configuration
+    .GetSection(MongoDbOptions.SectionName)
+    .Get<MongoDbOptions>();
+
+if (mongoDbOptions is null
+    || string.IsNullOrWhiteSpace(
+        mongoDbOptions.ConnectionString)
+    || string.IsNullOrWhiteSpace(
+        mongoDbOptions.DatabaseName))
+{
+    throw new InvalidOperationException(
+        "A seção MongoDb não foi configurada corretamente.");
+}
+
+builder.Services.AddSingleton(mongoDbOptions);
+builder.Services.AddSingleton<MongoDbContext>();
 
 var app = builder.Build();
 
@@ -10,7 +29,6 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
 app.MapControllers();
 
 app.Run();
