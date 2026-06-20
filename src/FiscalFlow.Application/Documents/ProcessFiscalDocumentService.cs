@@ -1,5 +1,4 @@
 using FiscalFlow.Application.Documents.Xml;
-using FiscalFlow.Domain.Documents;
 
 namespace FiscalFlow.Application.Documents;
 
@@ -38,36 +37,29 @@ public sealed class ProcessFiscalDocumentService
         ArgumentException.ThrowIfNullOrWhiteSpace(
             command.TenantId);
 
-        var tenantId =
-            command.TenantId.Trim();
+        var tenantId = command.TenantId.Trim();
+
+        var existingDocument =
+            await _repository.FindDomainByIdAsync(
+                command.DocumentId,
+                tenantId,
+                cancellationToken);
+
+        if (existingDocument is null)
+        {
+            throw new KeyNotFoundException(
+                $"O documento fiscal {command.DocumentId} não foi encontrado.");
+        }
 
         var document =
-            await _repository.FindDomainByIdAsync(
+            await _repository.TryStartProcessingAsync(
                 command.DocumentId,
                 tenantId,
                 cancellationToken);
 
         if (document is null)
         {
-            throw new KeyNotFoundException(
-                $"O documento fiscal {command.DocumentId} não foi encontrado.");
-        }
-
-        if (document.Status ==
-            DocumentProcessingStatus.Processed)
-        {
             return;
-        }
-
-        if (document.Status is
-            DocumentProcessingStatus.Received
-            or DocumentProcessingStatus.Failed)
-        {
-            document.MarkAsProcessing();
-
-            await _repository.UpdateAsync(
-                document,
-                cancellationToken);
         }
 
         try
