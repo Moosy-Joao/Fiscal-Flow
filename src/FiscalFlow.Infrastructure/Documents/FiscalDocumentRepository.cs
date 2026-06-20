@@ -55,25 +55,18 @@ public sealed class FiscalDocumentRepository
         return model is null ? null : MapToDetails(model);
     }
 
-    public async Task<FiscalDocumentDetails?>
-        FindByExternalDocumentIdAsync(
-            string tenantId,
-            string externalDocumentId,
-            CancellationToken cancellationToken = default)
+    public async Task<FiscalDocumentDetails?> FindByExternalDocumentIdAsync(
+        string tenantId,
+        string externalDocumentId,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(
-            externalDocumentId);
-
-        var normalizedTenantId = tenantId.Trim();
-        var normalizedExternalDocumentId =
-            externalDocumentId.Trim();
+        ArgumentException.ThrowIfNullOrWhiteSpace(externalDocumentId);
 
         var model = await _collection
             .Find(document =>
-                document.TenantId == normalizedTenantId
-                && document.ExternalDocumentId
-                    == normalizedExternalDocumentId)
+                document.TenantId == tenantId.Trim()
+                && document.ExternalDocumentId == externalDocumentId.Trim())
             .FirstOrDefaultAsync(cancellationToken);
 
         return model is null ? null : MapToDetails(model);
@@ -99,16 +92,10 @@ public sealed class FiscalDocumentRepository
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
 
-        var filterBuilder =
-            Builders<FiscalDocumentMongoModel>.Filter;
-
+        var filterBuilder = Builders<FiscalDocumentMongoModel>.Filter;
         var filter = filterBuilder.And(
-            filterBuilder.Eq(
-                document => document.Id,
-                id.ToString()),
-            filterBuilder.Eq(
-                document => document.TenantId,
-                tenantId.Trim()),
+            filterBuilder.Eq(document => document.Id, id.ToString()),
+            filterBuilder.Eq(document => document.TenantId, tenantId.Trim()),
             filterBuilder.In(
                 document => document.Status,
                 [
@@ -116,31 +103,20 @@ public sealed class FiscalDocumentRepository
                     DocumentProcessingStatus.Failed.ToString()
                 ]));
 
-        var updateBuilder =
-            Builders<FiscalDocumentMongoModel>.Update;
-
+        var updateBuilder = Builders<FiscalDocumentMongoModel>.Update;
         var update = updateBuilder.Combine(
             updateBuilder.Set(
                 document => document.Status,
                 DocumentProcessingStatus.Processing.ToString()),
-            updateBuilder.Unset(
-                document => document.ProcessedAtUtc),
-            updateBuilder.Unset(
-                document => document.FailureReason),
-            updateBuilder.Unset(
-                document => document.AccessKey),
-            updateBuilder.Unset(
-                document => document.IssuerDocument),
-            updateBuilder.Unset(
-                document => document.IssuerName),
-            updateBuilder.Unset(
-                document => document.RecipientDocument),
-            updateBuilder.Unset(
-                document => document.RecipientName),
-            updateBuilder.Unset(
-                document => document.TotalValue),
-            updateBuilder.Unset(
-                document => document.IssuedAt));
+            updateBuilder.Unset(document => document.ProcessedAtUtc),
+            updateBuilder.Unset(document => document.FailureReason),
+            updateBuilder.Unset(document => document.AccessKey),
+            updateBuilder.Unset(document => document.IssuerDocument),
+            updateBuilder.Unset(document => document.IssuerName),
+            updateBuilder.Unset(document => document.RecipientDocument),
+            updateBuilder.Unset(document => document.RecipientName),
+            updateBuilder.Unset(document => document.TotalValue),
+            updateBuilder.Unset(document => document.IssuedAt));
 
         var model = await _collection.FindOneAndUpdateAsync(
             filter,
@@ -156,6 +132,92 @@ public sealed class FiscalDocumentRepository
         return model is null ? null : MapToDomain(model);
     }
 
+    public async Task<IReadOnlyCollection<FiscalDocument>>
+        ClaimFailedForReprocessingAsync(
+            int maximumAttempts,
+            int batchSize,
+            CancellationToken cancellationToken = default)
+    {
+        if (maximumAttempts <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maximumAttempts),
+                "O limite de tentativas deve ser maior que zero.");
+        }
+
+        if (batchSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(batchSize),
+                "O tamanho do lote deve ser maior que zero.");
+        }
+
+        var claimedDocuments = new List<FiscalDocument>(batchSize);
+        var filterBuilder = Builders<FiscalDocumentMongoModel>.Filter;
+
+        var attemptsFilter = filterBuilder.Or(
+            filterBuilder.Exists(
+                document => document.ReprocessingAttempts,
+                false),
+            filterBuilder.Lt(
+                document => document.ReprocessingAttempts,
+                maximumAttempts));
+
+        var filter = filterBuilder.And(
+            filterBuilder.Eq(
+                document => document.Status,
+                DocumentProcessingStatus.Failed.ToString()),
+            attemptsFilter);
+
+        var updateBuilder = Builders<FiscalDocumentMongoModel>.Update;
+        var update = updateBuilder.Combine(
+            updateBuilder.Set(
+                document => document.Status,
+                DocumentProcessingStatus.Received.ToString()),
+            updateBuilder.Inc(
+                document => document.ReprocessingAttempts,
+                1),
+            updateBuilder.Set(
+                document => document.LastReprocessingAtUtc,
+                DateTime.UtcNow),
+            updateBuilder.Unset(document => document.ProcessedAtUtc),
+            updateBuilder.Unset(document => document.FailureReason),
+            updateBuilder.Unset(document => document.AccessKey),
+            updateBuilder.Unset(document => document.IssuerDocument),
+            updateBuilder.Unset(document => document.IssuerName),
+            updateBuilder.Unset(document => document.RecipientDocument),
+            updateBuilder.Unset(document => document.RecipientName),
+            updateBuilder.Unset(document => document.TotalValue),
+            updateBuilder.Unset(document => document.IssuedAt));
+
+        var options = new FindOneAndUpdateOptions<
+            FiscalDocumentMongoModel,
+            FiscalDocumentMongoModel>
+        {
+            ReturnDocument = ReturnDocument.After,
+            Sort = Builders<FiscalDocumentMongoModel>.Sort
+                .Ascending(document => document.ReceivedAtUtc)
+        };
+
+        for (var index = 0; index < batchSize; index++)
+        {
+            var model = await _collection.FindOneAndUpdateAsync(
+                filter,
+                update,
+                options,
+                cancellationToken);
+
+            if (model is null)
+            {
+                break;
+            }
+
+            claimedDocuments.Add(MapToDomain(model));
+        }
+
+        return claimedDocuments;
+    }
+
     public async Task UpdateAsync(
         FiscalDocument document,
         CancellationToken cancellationToken = default)
@@ -163,7 +225,6 @@ public sealed class FiscalDocumentRepository
         ArgumentNullException.ThrowIfNull(document);
 
         var model = MapToMongoModel(document);
-
         var result = await _collection.ReplaceOneAsync(
             stored =>
                 stored.Id == model.Id
@@ -178,21 +239,15 @@ public sealed class FiscalDocumentRepository
         }
     }
 
-    public async Task<PagedResult<FiscalDocumentDetails>>
-        ListAsync(
-            ListFiscalDocumentsQuery query,
-            CancellationToken cancellationToken = default)
+    public async Task<PagedResult<FiscalDocumentDetails>> ListAsync(
+        ListFiscalDocumentsQuery query,
+        CancellationToken cancellationToken = default)
     {
-        var builder =
-            Builders<FiscalDocumentMongoModel>.Filter;
-
-        var filters =
-            new List<FilterDefinition<FiscalDocumentMongoModel>>
-            {
-                builder.Eq(
-                    document => document.TenantId,
-                    query.TenantId)
-            };
+        var builder = Builders<FiscalDocumentMongoModel>.Filter;
+        var filters = new List<FilterDefinition<FiscalDocumentMongoModel>>
+        {
+            builder.Eq(document => document.TenantId, query.TenantId)
+        };
 
         if (query.Status is not null)
         {
@@ -203,7 +258,6 @@ public sealed class FiscalDocumentRepository
         }
 
         var filter = builder.And(filters);
-
         var totalItems = await _collection.CountDocumentsAsync(
             filter,
             cancellationToken: cancellationToken);
@@ -222,11 +276,10 @@ public sealed class FiscalDocumentRepository
             totalItems);
     }
 
-    private async Task<FiscalDocumentMongoModel?>
-        FindMongoModelByIdAsync(
-            Guid id,
-            string tenantId,
-            CancellationToken cancellationToken)
+    private async Task<FiscalDocumentMongoModel?> FindMongoModelByIdAsync(
+        Guid id,
+        string tenantId,
+        CancellationToken cancellationToken)
     {
         var idAsString = id.ToString();
 
@@ -249,15 +302,17 @@ public sealed class FiscalDocumentRepository
             AccessKey = document.FiscalData?.AccessKey,
             IssuerDocument = document.FiscalData?.IssuerDocument,
             IssuerName = document.FiscalData?.IssuerName,
-            RecipientDocument =
-                document.FiscalData?.RecipientDocument,
+            RecipientDocument = document.FiscalData?.RecipientDocument,
             RecipientName = document.FiscalData?.RecipientName,
             TotalValue = document.FiscalData?.TotalValue,
             IssuedAt = document.FiscalData?.IssuedAt.UtcDateTime,
             Status = document.Status.ToString(),
             ReceivedAtUtc = document.ReceivedAtUtc.UtcDateTime,
             ProcessedAtUtc = document.ProcessedAtUtc?.UtcDateTime,
-            FailureReason = document.FailureReason
+            FailureReason = document.FailureReason,
+            ReprocessingAttempts = document.ReprocessingAttempts,
+            LastReprocessingAtUtc =
+                document.LastReprocessingAtUtc?.UtcDateTime
         };
     }
 
@@ -284,7 +339,11 @@ public sealed class FiscalDocumentRepository
                 : ToDateTimeOffset(model.ProcessedAtUtc.Value),
             model.FailureReason,
             model.XmlContent,
-            MapToFiscalData(model));
+            MapToFiscalData(model),
+            model.ReprocessingAttempts,
+            model.LastReprocessingAtUtc is null
+                ? null
+                : ToDateTimeOffset(model.LastReprocessingAtUtc.Value));
     }
 
     private static FiscalDocumentDetails MapToDetails(
@@ -344,8 +403,7 @@ public sealed class FiscalDocumentRepository
             ToDateTimeOffset(model.IssuedAt.Value));
     }
 
-    private static DateTimeOffset ToDateTimeOffset(
-        DateTime value)
+    private static DateTimeOffset ToDateTimeOffset(DateTime value)
     {
         return new DateTimeOffset(
             DateTime.SpecifyKind(value, DateTimeKind.Utc));
