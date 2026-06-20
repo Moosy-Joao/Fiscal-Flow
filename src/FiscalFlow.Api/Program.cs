@@ -4,6 +4,7 @@ using FiscalFlow.Infrastructure.Documents;
 using FiscalFlow.Infrastructure.MongoDb;
 using FiscalFlow.Infrastructure.RabbitMq;
 using FiscalFlow.Application.Messaging;
+using FiscalFlow.Api.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,6 +71,9 @@ builder.Services.AddSingleton<
 builder.Services.AddSingleton<
     IFiscalDocumentReceivedPublisher,
     RabbitMqFiscalDocumentReceivedPublisher>();
+
+builder.Services.AddHostedService<
+    FiscalDocumentReceivedConsumer>();
 
 builder.Services.AddScoped<
     CreateFiscalDocumentService>();
