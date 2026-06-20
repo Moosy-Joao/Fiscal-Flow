@@ -68,7 +68,7 @@ branch → implementação → testes → Pull Request → merge → limpeza da 
 - [x] atualizar status automaticamente;
 - [x] implementar retry;
 - [x] implementar dead-letter queue;
-- [ ] testar duplicidade de mensagens;
+- [x] testar duplicidade de mensagens;
 - [x] testar indisponibilidade do broker.
 
 ### Definição de concluído
