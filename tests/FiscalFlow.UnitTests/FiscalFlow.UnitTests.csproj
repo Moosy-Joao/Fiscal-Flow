@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FiscalFlow.Domain\FiscalFlow.Domain.csproj" />
+    <ProjectReference Include="..\..\src\FiscalFlow.Application\FiscalFlow.Application.csproj" />
   </ItemGroup>
 
 </Project>

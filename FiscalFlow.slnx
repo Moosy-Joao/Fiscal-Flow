@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/FiscalFlow.Api/FiscalFlow.Api.csproj" />
+    <Project Path="src/FiscalFlow.Application/FiscalFlow.Application.csproj" />
     <Project Path="src/FiscalFlow.Domain/FiscalFlow.Domain.csproj" />
     <Project Path="src/FiscalFlow.Infrastructure/FiscalFlow.Infrastructure.csproj" />
   </Folder>
