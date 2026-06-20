@@ -32,7 +32,13 @@ public interface IFiscalDocumentRepository
         ClaimFailedForReprocessingAsync(
             int maximumAttempts,
             int batchSize,
-            CancellationToken cancellationToken = default);
+            CancellationToken cancellationToken = default)
+    {
+        IReadOnlyCollection<FiscalDocument> documents =
+            Array.Empty<FiscalDocument>();
+
+        return Task.FromResult(documents);
+    }
 
     Task UpdateAsync(
         FiscalDocument document,
