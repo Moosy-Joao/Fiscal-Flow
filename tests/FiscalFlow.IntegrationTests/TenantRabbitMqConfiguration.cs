@@ -1,6 +1,13 @@
+using Microsoft.AspNetCore.Hosting;
+
 namespace FiscalFlow.IntegrationTests;
 
 internal static class TenantRabbitMqConfiguration
 {
-    public const string Disabled = "false";
+    public static void UseTestingEnvironment(
+        IWebHostBuilder builder)
+    {
+        builder.UseEnvironment(
+            IntegrationTestSettings.EnvironmentName);
+    }
 }
