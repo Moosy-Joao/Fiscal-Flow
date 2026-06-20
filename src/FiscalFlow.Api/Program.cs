@@ -5,6 +5,7 @@ using FiscalFlow.Infrastructure.MongoDb;
 using FiscalFlow.Infrastructure.RabbitMq;
 using FiscalFlow.Application.Messaging;
 using FiscalFlow.Api.Messaging;
+using FiscalFlow.Application.Documents.Xml;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -60,6 +61,10 @@ builder.Services.AddSingleton<
     IFiscalDocumentRepository,
     FiscalDocumentRepository>();
 
+builder.Services.AddSingleton<
+    IFiscalDocumentXmlParser,
+    FiscalDocumentXmlParser>();
+
 builder.Services.AddSingleton(rabbitMqOptions);
 
 builder.Services.AddSingleton<
@@ -77,6 +82,9 @@ builder.Services.AddHostedService<
 
 builder.Services.AddScoped<
     CreateFiscalDocumentService>();
+
+builder.Services.AddScoped<
+    ProcessFiscalDocumentService>();
 
 builder.Services.AddScoped<
     GetFiscalDocumentByIdService>();

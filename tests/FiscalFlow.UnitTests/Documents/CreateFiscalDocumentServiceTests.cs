@@ -21,8 +21,9 @@ public sealed class CreateFiscalDocumentServiceTests
                 publisher);
 
         var command = new CreateFiscalDocumentCommand(
-            "empresa-demo",
-            "NFE-002");
+    "empresa-demo",
+    "NFE-002",
+    ValidXml);
 
         var result = await service.ExecuteAsync(
             command,
@@ -63,6 +64,10 @@ public sealed class CreateFiscalDocumentServiceTests
             publishedMessage.ExternalDocumentId);
 
         Assert.Equal(
+    ValidXml,
+    savedDocument.XmlContent);
+
+        Assert.Equal(
             savedDocument.ReceivedAtUtc,
             publishedMessage.ReceivedAtUtc);
 
@@ -86,8 +91,9 @@ public sealed class CreateFiscalDocumentServiceTests
                 publisher);
 
         var command = new CreateFiscalDocumentCommand(
-            "empresa-demo",
-            "NFE-IDEMPOTENTE");
+    "empresa-demo",
+    "NFE-IDEMPOTENTE",
+    ValidXml);
 
         var firstResult =
             await service.ExecuteAsync(command);
@@ -116,4 +122,30 @@ public sealed class CreateFiscalDocumentServiceTests
             firstResult.Id,
             publishedMessage.DocumentId);
     }
+
+    private const string ValidXml =
+    """
+    <nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+      <NFe>
+        <infNFe Id="NFe41260612345678000195550010000012341000012345">
+          <ide>
+            <dhEmi>2026-06-20T10:30:00-03:00</dhEmi>
+          </ide>
+          <emit>
+            <CNPJ>12345678000195</CNPJ>
+            <xNome>Empresa Emitente Ltda</xNome>
+          </emit>
+          <dest>
+            <CPF>12345678901</CPF>
+            <xNome>Cliente Destinatário</xNome>
+          </dest>
+          <total>
+            <ICMSTot>
+              <vNF>1500.75</vNF>
+            </ICMSTot>
+          </total>
+        </infNFe>
+      </NFe>
+    </nfeProc>
+    """;
 }

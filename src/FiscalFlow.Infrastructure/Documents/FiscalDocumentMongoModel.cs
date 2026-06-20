@@ -14,6 +14,10 @@ internal sealed class FiscalDocumentMongoModel
     public string ExternalDocumentId { get; init; } =
         string.Empty;
 
+    [BsonElement("xmlContent")]
+    [BsonIgnoreIfNull]
+    public string? XmlContent { get; init; }
+
     [BsonElement("status")]
     public string Status { get; init; } = string.Empty;
 

@@ -3,17 +3,38 @@ namespace FiscalFlow.Domain.Documents;
 public sealed class FiscalDocument
 {
     public Guid Id { get; }
+
     public string TenantId { get; }
+
     public string ExternalDocumentId { get; }
-    public DocumentProcessingStatus Status { get; private set; }
+
+    public string? XmlContent { get; }
+
+    public DocumentProcessingStatus Status
+    {
+        get;
+        private set;
+    }
+
     public DateTimeOffset ReceivedAtUtc { get; }
-    public DateTimeOffset? ProcessedAtUtc { get; private set; }
-    public string? FailureReason { get; private set; }
+
+    public DateTimeOffset? ProcessedAtUtc
+    {
+        get;
+        private set;
+    }
+
+    public string? FailureReason
+    {
+        get;
+        private set;
+    }
 
     public FiscalDocument(
         string tenantId,
         string externalDocumentId,
-        DateTimeOffset? receivedAtUtc = null)
+        DateTimeOffset? receivedAtUtc = null,
+        string? xmlContent = null)
         : this(
             Guid.NewGuid(),
             tenantId,
@@ -21,7 +42,8 @@ public sealed class FiscalDocument
             DocumentProcessingStatus.Received,
             receivedAtUtc ?? DateTimeOffset.UtcNow,
             null,
-            null)
+            null,
+            xmlContent)
     {
     }
 
@@ -32,7 +54,8 @@ public sealed class FiscalDocument
         DocumentProcessingStatus status,
         DateTimeOffset receivedAtUtc,
         DateTimeOffset? processedAtUtc,
-        string? failureReason)
+        string? failureReason,
+        string? xmlContent)
     {
         if (id == Guid.Empty)
         {
@@ -41,7 +64,9 @@ public sealed class FiscalDocument
                 nameof(id));
         }
 
-        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            tenantId);
+
         ArgumentException.ThrowIfNullOrWhiteSpace(
             externalDocumentId);
 
@@ -54,7 +79,8 @@ public sealed class FiscalDocument
         }
 
         if (status == DocumentProcessingStatus.Failed
-            && string.IsNullOrWhiteSpace(failureReason))
+            && string.IsNullOrWhiteSpace(
+                failureReason))
         {
             throw new ArgumentException(
                 "Um documento com falha precisa ter um motivo.",
@@ -63,11 +89,21 @@ public sealed class FiscalDocument
 
         Id = id;
         TenantId = tenantId.Trim();
-        ExternalDocumentId = externalDocumentId.Trim();
+
+        ExternalDocumentId =
+            externalDocumentId.Trim();
+
+        XmlContent =
+            string.IsNullOrWhiteSpace(xmlContent)
+                ? null
+                : xmlContent.Trim();
+
         Status = status;
         ReceivedAtUtc = receivedAtUtc;
         ProcessedAtUtc = processedAtUtc;
-        FailureReason = failureReason?.Trim();
+
+        FailureReason =
+            failureReason?.Trim();
     }
 
     public static FiscalDocument Rehydrate(
@@ -77,7 +113,8 @@ public sealed class FiscalDocument
         DocumentProcessingStatus status,
         DateTimeOffset receivedAtUtc,
         DateTimeOffset? processedAtUtc,
-        string? failureReason)
+        string? failureReason,
+        string? xmlContent = null)
     {
         return new FiscalDocument(
             id,
@@ -86,19 +123,24 @@ public sealed class FiscalDocument
             status,
             receivedAtUtc,
             processedAtUtc,
-            failureReason);
+            failureReason,
+            xmlContent);
     }
 
     public void MarkAsProcessing()
     {
-        if (Status is not DocumentProcessingStatus.Received
-            and not DocumentProcessingStatus.Failed)
+        if (Status is not
+                DocumentProcessingStatus.Received
+            and not
+                DocumentProcessingStatus.Failed)
         {
             throw new InvalidOperationException(
                 $"Não é possível iniciar o processamento de um documento com status {Status}.");
         }
 
-        Status = DocumentProcessingStatus.Processing;
+        Status =
+            DocumentProcessingStatus.Processing;
+
         ProcessedAtUtc = null;
         FailureReason = null;
     }
@@ -106,30 +148,38 @@ public sealed class FiscalDocument
     public void MarkAsProcessed(
         DateTimeOffset? processedAtUtc = null)
     {
-        if (Status != DocumentProcessingStatus.Processing)
+        if (Status !=
+            DocumentProcessingStatus.Processing)
         {
             throw new InvalidOperationException(
                 "O documento precisa estar em processamento antes de ser concluído.");
         }
 
-        Status = DocumentProcessingStatus.Processed;
+        Status =
+            DocumentProcessingStatus.Processed;
+
         ProcessedAtUtc =
-            processedAtUtc ?? DateTimeOffset.UtcNow;
+            processedAtUtc
+            ?? DateTimeOffset.UtcNow;
 
         FailureReason = null;
     }
 
     public void MarkAsFailed(string reason)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            reason);
 
-        if (Status == DocumentProcessingStatus.Processed)
+        if (Status ==
+            DocumentProcessingStatus.Processed)
         {
             throw new InvalidOperationException(
                 "Um documento processado não pode ser marcado como falha.");
         }
 
-        Status = DocumentProcessingStatus.Failed;
+        Status =
+            DocumentProcessingStatus.Failed;
+
         ProcessedAtUtc = null;
         FailureReason = reason.Trim();
     }
