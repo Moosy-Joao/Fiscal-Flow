@@ -10,7 +10,7 @@ public sealed class FiscalDocumentTests
         var receivedAt = new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero);
         var document = new FiscalDocument("tenant-a", "NFE-123", receivedAt);
 
-        Assert.False(string.IsNullOrWhiteSpace(document.Id));
+        Assert.NotEqual(Guid.Empty, document.Id);
         Assert.Equal("tenant-a", document.TenantId);
         Assert.Equal("NFE-123", document.ExternalDocumentId);
         Assert.Equal(DocumentProcessingStatus.Received, document.Status);
