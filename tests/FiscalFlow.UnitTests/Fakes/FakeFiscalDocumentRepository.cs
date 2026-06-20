@@ -14,8 +14,7 @@ internal sealed class FakeFiscalDocumentRepository
     {
         var alreadyExists = Documents.Any(
             savedDocument =>
-                savedDocument.TenantId
-                    == document.TenantId
+                savedDocument.TenantId == document.TenantId
                 && savedDocument.ExternalDocumentId
                     == document.ExternalDocumentId);
 
@@ -27,7 +26,6 @@ internal sealed class FakeFiscalDocumentRepository
         }
 
         Documents.Add(document);
-
         return Task.CompletedTask;
     }
 
@@ -37,20 +35,11 @@ internal sealed class FakeFiscalDocumentRepository
         CancellationToken cancellationToken = default)
     {
         var document = Documents.SingleOrDefault(
-            item =>
-                item.Id == id
+            item => item.Id == id
                 && item.TenantId == tenantId);
 
-        if (document is null)
-        {
-            return Task.FromResult<
-                FiscalDocumentDetails?>(null);
-        }
-
-        var details = MapToDetails(document);
-
-        return Task.FromResult<
-            FiscalDocumentDetails?>(details);
+        return Task.FromResult(
+            document is null ? null : MapToDetails(document));
     }
 
     public Task<FiscalDocument?> FindDomainByIdAsync(
@@ -59,8 +48,7 @@ internal sealed class FakeFiscalDocumentRepository
         CancellationToken cancellationToken = default)
     {
         var document = Documents.SingleOrDefault(
-            item =>
-                item.Id == id
+            item => item.Id == id
                 && item.TenantId == tenantId);
 
         return Task.FromResult(document);
@@ -71,10 +59,8 @@ internal sealed class FakeFiscalDocumentRepository
         CancellationToken cancellationToken = default)
     {
         var index = Documents.FindIndex(
-            item =>
-                item.Id == document.Id
-                && item.TenantId
-                    == document.TenantId);
+            item => item.Id == document.Id
+                && item.TenantId == document.TenantId);
 
         if (index < 0)
         {
@@ -83,57 +69,57 @@ internal sealed class FakeFiscalDocumentRepository
         }
 
         Documents[index] = document;
-
         return Task.CompletedTask;
     }
 
-    public Task<PagedResult<FiscalDocumentDetails>>
-        ListAsync(
-            ListFiscalDocumentsQuery query,
-            CancellationToken cancellationToken = default)
+    public Task<PagedResult<FiscalDocumentDetails>> ListAsync(
+        ListFiscalDocumentsQuery query,
+        CancellationToken cancellationToken = default)
     {
-        IEnumerable<FiscalDocument> filteredDocuments =
-            Documents.Where(
-                document =>
-                    document.TenantId
-                        == query.TenantId);
+        IEnumerable<FiscalDocument> filtered = Documents.Where(
+            document => document.TenantId == query.TenantId);
 
         if (query.Status is not null)
         {
-            filteredDocuments =
-                filteredDocuments.Where(
-                    document =>
-                        document.Status
-                            == query.Status.Value);
+            filtered = filtered.Where(
+                document => document.Status == query.Status.Value);
         }
 
-        var totalItems =
-            filteredDocuments.LongCount();
-
-        var items = filteredDocuments
-            .OrderByDescending(
-                document =>
-                    document.ReceivedAtUtc)
-            .Skip(
-                (query.Page - 1)
-                * query.PageSize)
+        var totalItems = filtered.LongCount();
+        var items = filtered
+            .OrderByDescending(document => document.ReceivedAtUtc)
+            .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .Select(MapToDetails)
             .ToList();
 
-        var result =
+        return Task.FromResult(
             new PagedResult<FiscalDocumentDetails>(
                 items,
                 query.Page,
                 query.PageSize,
-                totalItems);
+                totalItems));
+    }
 
-        return Task.FromResult(result);
+    public Task<FiscalDocumentDetails?>
+        FindByExternalDocumentIdAsync(
+            string tenantId,
+            string externalDocumentId,
+            CancellationToken cancellationToken = default)
+    {
+        var document = Documents.SingleOrDefault(
+            item => item.TenantId == tenantId
+                && item.ExternalDocumentId == externalDocumentId);
+
+        return Task.FromResult(
+            document is null ? null : MapToDetails(document));
     }
 
     private static FiscalDocumentDetails MapToDetails(
         FiscalDocument document)
     {
+        var data = document.FiscalData;
+
         return new FiscalDocumentDetails(
             document.Id,
             document.TenantId,
@@ -141,29 +127,16 @@ internal sealed class FakeFiscalDocumentRepository
             document.Status.ToString(),
             document.ReceivedAtUtc,
             document.ProcessedAtUtc,
-            document.FailureReason);
-    }
-
-    public Task<FiscalDocumentDetails?>
-    FindByExternalDocumentIdAsync(
-        string tenantId,
-        string externalDocumentId,
-        CancellationToken cancellationToken = default)
-    {
-        var document = Documents.SingleOrDefault(
-            item =>
-                item.TenantId == tenantId
-                && item.ExternalDocumentId
-                    == externalDocumentId);
-
-        if (document is null)
-        {
-            return Task.FromResult<
-                FiscalDocumentDetails?>(null);
-        }
-
-        return Task.FromResult<
-            FiscalDocumentDetails?>(
-                MapToDetails(document));
+            document.FailureReason,
+            data is null
+                ? null
+                : new FiscalDocumentDataDetails(
+                    data.AccessKey,
+                    data.IssuerDocument,
+                    data.IssuerName,
+                    data.RecipientDocument,
+                    data.RecipientName,
+                    data.TotalValue,
+                    data.IssuedAt));
     }
 }

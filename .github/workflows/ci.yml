@@ -26,4 +26,12 @@ jobs:
         run: dotnet build FiscalFlow.slnx --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test FiscalFlow.slnx --configuration Release --no-build --collect:"XPlat Code Coverage"
+        run: dotnet test FiscalFlow.slnx --configuration Release --no-build --logger trx --results-directory TestResults --collect:"XPlat Code Coverage"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults
+          if-no-files-found: warn

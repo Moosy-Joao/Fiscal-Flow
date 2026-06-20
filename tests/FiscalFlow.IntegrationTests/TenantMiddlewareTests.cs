@@ -1,43 +1,31 @@
 using System.Net;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
 
 namespace FiscalFlow.IntegrationTests;
 
 public sealed class TenantMiddlewareTests
-	: IClassFixture<WebApplicationFactory<Program>>
+    : IClassFixture<WebApplicationFactory<Program>>
 {
-	private readonly HttpClient _client;
+    private readonly HttpClient _client;
 
-	public TenantMiddlewareTests(
-		WebApplicationFactory<Program> factory)
-	{
-		_client = factory
-			.WithWebHostBuilder(builder =>
-			{
-				builder.ConfigureAppConfiguration(
-					(_, configuration) =>
-					{
-						configuration.AddInMemoryCollection(
-							new Dictionary<string, string?>
-							{
-								["MongoDb:InitializeIndexes"] =
-									"false"
-							});
-					});
-			})
-			.CreateClient();
-	}
+    public TenantMiddlewareTests(
+        WebApplicationFactory<Program> factory)
+    {
+        _client = factory
+            .WithWebHostBuilder(
+                TenantRabbitMqConfiguration
+                    .UseTestingEnvironment)
+            .CreateClient();
+    }
 
-	[Fact]
-	public async Task GetDocuments_WithoutTenantHeader_ShouldReturnBadRequest()
-	{
-		var response = await _client.GetAsync(
-			"/api/fiscal-documents");
+    [Fact]
+    public async Task GetDocuments_WithoutTenantHeader_ShouldReturnBadRequest()
+    {
+        var response = await _client.GetAsync(
+            "/api/fiscal-documents");
 
-		Assert.Equal(
-			HttpStatusCode.BadRequest,
-			response.StatusCode);
-	}
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            response.StatusCode);
+    }
 }
