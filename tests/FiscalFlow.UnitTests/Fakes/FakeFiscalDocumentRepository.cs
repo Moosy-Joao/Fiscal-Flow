@@ -12,6 +12,19 @@ internal sealed class FakeFiscalDocumentRepository
         FiscalDocument document,
         CancellationToken cancellationToken = default)
     {
+        var alreadyExists = Documents.Any(
+    savedDocument =>
+        savedDocument.TenantId == document.TenantId
+        && savedDocument.ExternalDocumentId
+            == document.ExternalDocumentId);
+
+        if (alreadyExists)
+        {
+            throw new DuplicateFiscalDocumentException(
+                document.TenantId,
+                document.ExternalDocumentId);
+        }
+
         Documents.Add(document);
 
         return Task.CompletedTask;
