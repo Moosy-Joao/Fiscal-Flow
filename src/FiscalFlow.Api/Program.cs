@@ -31,6 +31,9 @@ builder.Services.AddSingleton<
 builder.Services.AddScoped<
     CreateFiscalDocumentService>();
 
+builder.Services.AddScoped<
+    GetFiscalDocumentByIdService>();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
