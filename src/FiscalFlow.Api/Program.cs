@@ -1,11 +1,10 @@
+using FiscalFlow.Api.Configuration;
 using FiscalFlow.Api.Tenancy;
 using FiscalFlow.Application.Documents;
+using FiscalFlow.Application.Documents.Xml;
 using FiscalFlow.Infrastructure.Documents;
 using FiscalFlow.Infrastructure.MongoDb;
 using FiscalFlow.Infrastructure.RabbitMq;
-using FiscalFlow.Application.Messaging;
-using FiscalFlow.Api.Messaging;
-using FiscalFlow.Application.Documents.Xml;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,31 +25,6 @@ if (mongoDbOptions is null
         "A seção MongoDb não foi configurada corretamente.");
 }
 
-var rabbitMqOptions = builder.Configuration
-    .GetSection(RabbitMqOptions.SectionName)
-    .Get<RabbitMqOptions>();
-
-if (rabbitMqOptions is null
-    || string.IsNullOrWhiteSpace(
-        rabbitMqOptions.HostName)
-    || string.IsNullOrWhiteSpace(
-        rabbitMqOptions.UserName)
-    || string.IsNullOrWhiteSpace(
-        rabbitMqOptions.Password)
-    || string.IsNullOrWhiteSpace(
-        rabbitMqOptions.VirtualHost)
-    || string.IsNullOrWhiteSpace(
-        rabbitMqOptions.ExchangeName)
-    || string.IsNullOrWhiteSpace(
-        rabbitMqOptions.QueueName)
-    || string.IsNullOrWhiteSpace(
-        rabbitMqOptions.RoutingKey)
-    || rabbitMqOptions.Port <= 0)
-{
-    throw new InvalidOperationException(
-        "A seção RabbitMq não foi configurada corretamente.");
-}
-
 builder.Services.AddSingleton(mongoDbOptions);
 builder.Services.AddSingleton<MongoDbContext>();
 
@@ -65,20 +39,8 @@ builder.Services.AddSingleton<
     IFiscalDocumentXmlParser,
     FiscalDocumentXmlParser>();
 
-builder.Services.AddSingleton(rabbitMqOptions);
-
-builder.Services.AddSingleton<
-    RabbitMqConnectionFactory>();
-
-builder.Services.AddSingleton<
-    RabbitMqTopologyInitializer>();
-
-builder.Services.AddSingleton<
-    IFiscalDocumentReceivedPublisher,
-    RabbitMqFiscalDocumentReceivedPublisher>();
-
-builder.Services.AddHostedService<
-    FiscalDocumentReceivedConsumer>();
+var rabbitMqEnabled =
+    builder.AddRabbitMqFeature();
 
 builder.Services.AddScoped<
     CreateFiscalDocumentService>();
@@ -108,11 +70,14 @@ if (mongoDbOptions.InitializeIndexes)
     await indexManager.EnsureCreatedAsync();
 }
 
-var rabbitMqTopologyInitializer =
-    app.Services.GetRequiredService<
-        RabbitMqTopologyInitializer>();
+if (rabbitMqEnabled)
+{
+    var topologyInitializer =
+        app.Services.GetRequiredService<
+            RabbitMqTopologyInitializer>();
 
-await rabbitMqTopologyInitializer.InitializeAsync();
+    await topologyInitializer.InitializeAsync();
+}
 
 if (app.Environment.IsDevelopment())
 {
