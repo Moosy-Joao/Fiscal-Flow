@@ -100,6 +100,31 @@ public sealed class InMemoryFiscalDocumentRepository :
         }
     }
 
+    public Task<FiscalDocument?> TryStartProcessingAsync(
+        Guid id,
+        string tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (_lock)
+        {
+            var document = _documents.SingleOrDefault(
+                item => item.Id == id
+                    && item.TenantId == tenantId);
+
+            if (document is null
+                || document.Status is not
+                    DocumentProcessingStatus.Received
+                    and not DocumentProcessingStatus.Failed)
+            {
+                return Task.FromResult<FiscalDocument?>(null);
+            }
+
+            document.MarkAsProcessing();
+
+            return Task.FromResult<FiscalDocument?>(document);
+        }
+    }
+
     public Task UpdateAsync(
         FiscalDocument document,
         CancellationToken cancellationToken = default)
