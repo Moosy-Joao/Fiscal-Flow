@@ -32,12 +32,22 @@ public sealed class CreateFiscalDocumentService
             command.TenantId);
 
         ArgumentException.ThrowIfNullOrWhiteSpace(
+    command.TenantId);
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(
             command.ExternalDocumentId);
 
-        var tenantId = command.TenantId.Trim();
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            command.XmlContent);
+
+        var tenantId =
+            command.TenantId.Trim();
 
         var externalDocumentId =
             command.ExternalDocumentId.Trim();
+
+        var xmlContent =
+            command.XmlContent.Trim();
 
         var existingDocument =
             await _repository
@@ -55,7 +65,8 @@ public sealed class CreateFiscalDocumentService
 
         var document = new FiscalDocument(
             tenantId,
-            externalDocumentId);
+            externalDocumentId,
+            xmlContent: xmlContent);
 
         try
         {

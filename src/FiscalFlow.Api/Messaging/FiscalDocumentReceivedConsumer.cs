@@ -4,6 +4,7 @@ using FiscalFlow.Application.Messaging;
 using FiscalFlow.Infrastructure.RabbitMq;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using FiscalFlow.Application.Documents;
 
 namespace FiscalFlow.Api.Messaging;
 
@@ -19,24 +20,33 @@ public sealed class FiscalDocumentReceivedConsumer :
 
     private readonly RabbitMqOptions _options;
 
+    private readonly IServiceScopeFactory
+    _scopeFactory;
+
     private readonly ILogger<
         FiscalDocumentReceivedConsumer> _logger;
 
     private IChannel? _channel;
 
     public FiscalDocumentReceivedConsumer(
-        RabbitMqConnectionFactory connectionFactory,
-        RabbitMqOptions options,
-        ILogger<FiscalDocumentReceivedConsumer> logger)
+    RabbitMqConnectionFactory connectionFactory,
+    RabbitMqOptions options,
+    IServiceScopeFactory scopeFactory,
+    ILogger<FiscalDocumentReceivedConsumer> logger)
     {
         ArgumentNullException.ThrowIfNull(
             connectionFactory);
 
         ArgumentNullException.ThrowIfNull(options);
+
+        ArgumentNullException.ThrowIfNull(
+            scopeFactory);
+
         ArgumentNullException.ThrowIfNull(logger);
 
         _connectionFactory = connectionFactory;
         _options = options;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -120,6 +130,34 @@ public sealed class FiscalDocumentReceivedConsumer :
                 message.DocumentId,
                 message.TenantId,
                 message.ExternalDocumentId,
+                message.CorrelationId);
+
+            using var scope =
+    _scopeFactory.CreateScope();
+
+            var processingService =
+                scope.ServiceProvider
+                    .GetRequiredService<
+                        ProcessFiscalDocumentService>();
+
+            var command =
+                new ProcessFiscalDocumentCommand(
+                    message.DocumentId,
+                    message.TenantId);
+
+            await processingService.ExecuteAsync(
+                command,
+                eventArgs.CancellationToken);
+
+            _logger.LogInformation(
+                """
+    Documento fiscal processado com sucesso.
+    DocumentId: {DocumentId}
+    TenantId: {TenantId}
+    CorrelationId: {CorrelationId}
+    """,
+                message.DocumentId,
+                message.TenantId,
                 message.CorrelationId);
 
             await channel.BasicAckAsync(

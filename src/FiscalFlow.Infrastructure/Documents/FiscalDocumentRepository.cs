@@ -128,7 +128,8 @@ public sealed class FiscalDocumentRepository
                 ? null
                 : ToDateTimeOffset(
                     mongoModel.ProcessedAtUtc.Value),
-            mongoModel.FailureReason);
+            mongoModel.FailureReason,
+mongoModel.XmlContent);
     }
 
     public async Task UpdateAsync(
@@ -230,6 +231,7 @@ public sealed class FiscalDocumentRepository
             TenantId = document.TenantId,
             ExternalDocumentId =
                 document.ExternalDocumentId,
+            XmlContent = document.XmlContent,
             Status = document.Status.ToString(),
             ReceivedAtUtc =
                 document.ReceivedAtUtc.UtcDateTime,

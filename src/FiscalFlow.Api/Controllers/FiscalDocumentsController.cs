@@ -54,8 +54,9 @@ public sealed class FiscalDocumentsController
     CancellationToken cancellationToken)
     {
         var command = new CreateFiscalDocumentCommand(
-            _tenantContext.TenantId,
-            request.ExternalDocumentId);
+    _tenantContext.TenantId,
+    request.ExternalDocumentId,
+    request.XmlContent);
 
         var result = await _createService.ExecuteAsync(
             command,
