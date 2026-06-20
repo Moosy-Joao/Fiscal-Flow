@@ -66,7 +66,6 @@ app.UseMiddleware<TenantMiddleware>();
 
 app.MapControllers();
 
-app.MapControllers();
 
 app.Run();
 
