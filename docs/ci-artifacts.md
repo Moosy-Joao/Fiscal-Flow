@@ -1,0 +1,1 @@
+CI publishes test artifacts.
