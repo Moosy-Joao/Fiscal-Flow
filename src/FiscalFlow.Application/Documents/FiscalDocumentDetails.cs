@@ -1,4 +1,4 @@
-﻿namespace FiscalFlow.Application.Documents;
+namespace FiscalFlow.Application.Documents;
 
 public sealed record FiscalDocumentDetails(
     Guid Id,
@@ -7,4 +7,5 @@ public sealed record FiscalDocumentDetails(
     string Status,
     DateTimeOffset ReceivedAtUtc,
     DateTimeOffset? ProcessedAtUtc,
-    string? FailureReason);
+    string? FailureReason,
+    FiscalDocumentDataDetails? FiscalData = null);
