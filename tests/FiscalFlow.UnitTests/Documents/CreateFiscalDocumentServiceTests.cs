@@ -39,11 +39,14 @@ public sealed class CreateFiscalDocumentServiceTests
             savedDocument.ExternalDocumentId);
 
         Assert.Equal(savedDocument.Id, result.Id);
+
         Assert.Equal("Received", result.Status);
+
+        Assert.True(result.WasCreated);
     }
 
     [Fact]
-    public async Task ExecuteAsync_ShouldRejectDuplicateDocument()
+    public async Task ExecuteAsync_ShouldReturnExistingDocument_WhenRepeated()
     {
         var repository =
             new FakeFiscalDocumentRepository();
@@ -53,12 +56,26 @@ public sealed class CreateFiscalDocumentServiceTests
 
         var command = new CreateFiscalDocumentCommand(
             "empresa-demo",
-            "NFE-DUPLICADA");
+            "NFE-IDEMPOTENTE");
 
-        await service.ExecuteAsync(command);
+        var firstResult =
+            await service.ExecuteAsync(command);
 
-        await Assert.ThrowsAsync<
-            DuplicateFiscalDocumentException>(
-            () => service.ExecuteAsync(command));
+        var secondResult =
+            await service.ExecuteAsync(command);
+
+        var savedDocument =
+            Assert.Single(repository.Documents);
+
+        Assert.True(firstResult.WasCreated);
+        Assert.False(secondResult.WasCreated);
+
+        Assert.Equal(
+            firstResult.Id,
+            secondResult.Id);
+
+        Assert.Equal(
+            savedDocument.Id,
+            secondResult.Id);
     }
 }
