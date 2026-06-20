@@ -23,10 +23,11 @@ public static class InfrastructureServiceCollectionExtensions
 
         services.AddScoped<IFiscalDocumentRepository, FiscalDocumentRepository>();
         services.AddScoped<IIdempotencyRepository, IdempotencyRepository>();
-        services.AddScoped<IDocumentDispatchQueue, RabbitMqDispatchQueue>();
+        services.AddSingleton<IDocumentDispatchQueue, RabbitMqDispatchQueue>();
         services.AddScoped<IFiscalDocumentService, FiscalDocumentService>();
         services.AddScoped<IFiscalDocumentProcessor, FiscalDocumentProcessor>();
         services.AddScoped<FiscalDocumentProcessingJob>();
+        services.AddHostedService<MongoIndexInitializerHostedService>();
 
         services.AddHangfire(config =>
         {

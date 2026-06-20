@@ -6,29 +6,32 @@ using RabbitMQ.Client;
 
 namespace FiscalFlow.Infrastructure.Messaging;
 
-public sealed class RabbitMqDispatchQueue : IDocumentDispatchQueue
+public sealed class RabbitMqDispatchQueue : IDocumentDispatchQueue, IDisposable
 {
     private readonly RabbitMqOptions _options;
+    private readonly Lazy<IConnection> _connection;
 
     public RabbitMqDispatchQueue(IOptions<RabbitMqOptions> options)
     {
         _options = options.Value;
+        _connection = new Lazy<IConnection>(() =>
+        {
+            var factory = new ConnectionFactory
+            {
+                HostName = _options.HostName,
+                Port = _options.Port,
+                UserName = _options.UserName,
+                Password = _options.Password
+            };
+
+            return factory.CreateConnection();
+        });
     }
 
     public Task PublishAsync(string tenantId, string documentId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-
-        var factory = new ConnectionFactory
-        {
-            HostName = _options.HostName,
-            Port = _options.Port,
-            UserName = _options.UserName,
-            Password = _options.Password
-        };
-
-        using var connection = factory.CreateConnection();
-        using var channel = connection.CreateModel();
+        using var channel = _connection.Value.CreateModel();
 
         channel.QueueDeclare(
             queue: _options.QueueName,
@@ -50,5 +53,13 @@ public sealed class RabbitMqDispatchQueue : IDocumentDispatchQueue
             body: body);
 
         return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        if (_connection.IsValueCreated)
+        {
+            _connection.Value.Dispose();
+        }
     }
 }

@@ -13,15 +13,6 @@ public sealed class IdempotencyRepository : IIdempotencyRepository
     {
         var database = mongoClient.GetDatabase(options.Value.DatabaseName);
         _collection = database.GetCollection<IdempotencyRecord>("idempotency_records");
-
-        var indexKeys = Builders<IdempotencyRecord>.IndexKeys
-            .Ascending(x => x.TenantId)
-            .Ascending(x => x.IdempotencyKey);
-
-        _collection.Indexes.CreateOne(
-            new CreateIndexModel<IdempotencyRecord>(
-                indexKeys,
-                new CreateIndexOptions { Background = true, Unique = true }));
     }
 
     public async Task<IdempotencyRecord?> GetAsync(string tenantId, string idempotencyKey, CancellationToken cancellationToken)

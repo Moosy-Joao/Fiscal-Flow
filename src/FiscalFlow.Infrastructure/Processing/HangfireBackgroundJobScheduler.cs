@@ -14,6 +14,6 @@ public sealed class HangfireBackgroundJobScheduler : IBackgroundJobScheduler
 
     public void EnqueueProcessing(string tenantId, string documentId)
     {
-        _jobs.Enqueue<FiscalDocumentProcessingJob>(job => job.ProcessAsync(tenantId, documentId));
+        _jobs.Enqueue<FiscalDocumentProcessingJob>(job => job.ProcessAsync(tenantId, documentId, JobCancellationToken.Null));
     }
 }

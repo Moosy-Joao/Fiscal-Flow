@@ -13,12 +13,6 @@ public sealed class FiscalDocumentRepository : IFiscalDocumentRepository
     {
         var database = mongoClient.GetDatabase(options.Value.DatabaseName);
         _collection = database.GetCollection<FiscalDocument>("fiscal_documents");
-
-        var indexKeys = Builders<FiscalDocument>.IndexKeys
-            .Ascending(x => x.TenantId)
-            .Ascending(x => x.ExternalDocumentId);
-        _collection.Indexes.CreateOne(
-            new CreateIndexModel<FiscalDocument>(indexKeys, new CreateIndexOptions { Background = true }));
     }
 
     public async Task<FiscalDocument?> GetByIdAsync(string tenantId, string documentId, CancellationToken cancellationToken)

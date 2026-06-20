@@ -1,3 +1,5 @@
+using Hangfire;
+
 namespace FiscalFlow.Infrastructure.Processing;
 
 public sealed class FiscalDocumentProcessingJob
@@ -9,8 +11,8 @@ public sealed class FiscalDocumentProcessingJob
         _processor = processor;
     }
 
-    public async Task ProcessAsync(string tenantId, string documentId)
+    public async Task ProcessAsync(string tenantId, string documentId, IJobCancellationToken cancellationToken)
     {
-        await _processor.ProcessAsync(tenantId, documentId, CancellationToken.None);
+        await _processor.ProcessAsync(tenantId, documentId, cancellationToken.ShutdownToken);
     }
 }
