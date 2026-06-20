@@ -1,47 +1,56 @@
-# Fiscal-Flow
+# FiscalFlow
 
-SaaS multi-tenant para recebimento e processamento de documentos fiscais eletrônicos.
+Projeto de estudo para aprender, passo a passo, como construir uma API SaaS multi-tenant para recebimento e processamento de documentos fiscais.
 
-## Stack implementada
+## Estado atual
 
-- ASP.NET Core (API)
-- MongoDB (persistência principal + Hangfire storage)
-- RabbitMQ (fila de ingestão)
-- Hangfire (processamento assíncrono)
-- OpenTelemetry (traces/métricas) + health check
-- Docker + docker-compose
+A primeira fase contém somente:
 
-## Como executar
+- solução organizada em projetos;
+- API ASP.NET Core com endpoint de saúde;
+- domínio independente de banco de dados;
+- testes unitários;
+- testes de integração;
+- GitHub Actions para build e testes;
+- MongoDB disponível no Docker, ainda sem integração com a API.
+
+RabbitMQ, Hangfire, idempotência, multi-tenancy e observabilidade serão adicionados depois, um assunto por vez.
+
+## Executar
 
 ```bash
 dotnet restore FiscalFlow.slnx
-dotnet run --project /home/runner/work/Fiscal-Flow/Fiscal-Flow/src/FiscalFlow.Api/FiscalFlow.Api.csproj
+dotnet build FiscalFlow.slnx
+dotnet test FiscalFlow.slnx
 ```
-
-Ou com containers:
 
 ```bash
-docker compose up --build
+dotnet run --project src/FiscalFlow.Api/FiscalFlow.Api.csproj --launch-profile http
 ```
 
-## Endpoint principal
+Endpoint inicial:
 
-`POST /api/fiscal-documents`
-
-Headers obrigatórios:
-- `X-Tenant-Id`
-- `Idempotency-Key`
-
-Body (JSON):
-
-```json
-{
-  "externalDocumentId": "NFE-123",
-  "payload": {
-    "numero": "123",
-    "valor": 120.50
-  }
-}
+```text
+http://localhost:5298/api/health
 ```
 
-Resposta: `202 Accepted` com `documentId`, `duplicate` e `tenantId`.
+## MongoDB local
+
+```bash
+docker compose up -d mongodb
+```
+
+O MongoDB ainda não está conectado à API. Essa será a próxima etapa prática.
+
+## Roteiro
+
+1. Fundação, testes e integração contínua.
+2. Conceitos básicos e conexão com MongoDB.
+3. CRUD de documentos fiscais.
+4. Índices, filtros e paginação.
+5. Multi-tenancy.
+6. Idempotência e concorrência.
+7. RabbitMQ com produtor e consumidor.
+8. Hangfire para tarefas agendadas.
+9. Importação de XML.
+10. Logs, métricas e publicação.
