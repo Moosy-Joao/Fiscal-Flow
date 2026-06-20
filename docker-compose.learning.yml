@@ -8,5 +8,29 @@ services:
     volumes:
       - fiscalflow-mongodb-data:/data/db
 
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: fiscalflow-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: fiscalflow
+      RABBITMQ_DEFAULT_PASS: fiscalflow
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - fiscalflow-rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test:
+        - CMD
+        - rabbitmq-diagnostics
+        - -q
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
 volumes:
   fiscalflow-mongodb-data:
+  fiscalflow-rabbitmq-data:

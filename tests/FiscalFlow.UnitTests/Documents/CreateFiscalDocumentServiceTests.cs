@@ -7,13 +7,18 @@ namespace FiscalFlow.UnitTests.Documents;
 public sealed class CreateFiscalDocumentServiceTests
 {
     [Fact]
-    public async Task ExecuteAsync_ShouldPersistReceivedDocument()
+    public async Task ExecuteAsync_ShouldPersistAndPublishReceivedDocument()
     {
         var repository =
             new FakeFiscalDocumentRepository();
 
+        var publisher =
+            new FakeFiscalDocumentReceivedPublisher();
+
         var service =
-            new CreateFiscalDocumentService(repository);
+            new CreateFiscalDocumentService(
+                repository,
+                publisher);
 
         var command = new CreateFiscalDocumentCommand(
             "empresa-demo",
@@ -25,6 +30,9 @@ public sealed class CreateFiscalDocumentServiceTests
 
         var savedDocument =
             Assert.Single(repository.Documents);
+
+        var publishedMessage =
+            Assert.Single(publisher.Messages);
 
         Assert.Equal(
             DocumentProcessingStatus.Received,
@@ -39,20 +47,43 @@ public sealed class CreateFiscalDocumentServiceTests
             savedDocument.ExternalDocumentId);
 
         Assert.Equal(savedDocument.Id, result.Id);
-
         Assert.Equal("Received", result.Status);
-
         Assert.True(result.WasCreated);
+
+        Assert.Equal(
+            savedDocument.Id,
+            publishedMessage.DocumentId);
+
+        Assert.Equal(
+            savedDocument.TenantId,
+            publishedMessage.TenantId);
+
+        Assert.Equal(
+            savedDocument.ExternalDocumentId,
+            publishedMessage.ExternalDocumentId);
+
+        Assert.Equal(
+            savedDocument.ReceivedAtUtc,
+            publishedMessage.ReceivedAtUtc);
+
+        Assert.NotEqual(
+            Guid.Empty,
+            publishedMessage.CorrelationId);
     }
 
     [Fact]
-    public async Task ExecuteAsync_ShouldReturnExistingDocument_WhenRepeated()
+    public async Task ExecuteAsync_ShouldNotPublishAgain_WhenRepeated()
     {
         var repository =
             new FakeFiscalDocumentRepository();
 
+        var publisher =
+            new FakeFiscalDocumentReceivedPublisher();
+
         var service =
-            new CreateFiscalDocumentService(repository);
+            new CreateFiscalDocumentService(
+                repository,
+                publisher);
 
         var command = new CreateFiscalDocumentCommand(
             "empresa-demo",
@@ -67,6 +98,9 @@ public sealed class CreateFiscalDocumentServiceTests
         var savedDocument =
             Assert.Single(repository.Documents);
 
+        var publishedMessage =
+            Assert.Single(publisher.Messages);
+
         Assert.True(firstResult.WasCreated);
         Assert.False(secondResult.WasCreated);
 
@@ -77,5 +111,9 @@ public sealed class CreateFiscalDocumentServiceTests
         Assert.Equal(
             savedDocument.Id,
             secondResult.Id);
+
+        Assert.Equal(
+            firstResult.Id,
+            publishedMessage.DocumentId);
     }
 }
