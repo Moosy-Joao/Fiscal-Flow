@@ -9,16 +9,21 @@ public interface IFiscalDocumentRepository
         CancellationToken cancellationToken = default);
 
     Task<FiscalDocumentDetails?> FindByIdAsync(
-    Guid id,
-    string tenantId,
-    CancellationToken cancellationToken = default);
+        Guid id,
+        string tenantId,
+        CancellationToken cancellationToken = default);
 
     Task<FiscalDocumentDetails?> FindByExternalDocumentIdAsync(
-    string tenantId,
-    string externalDocumentId,
-    CancellationToken cancellationToken = default);
+        string tenantId,
+        string externalDocumentId,
+        CancellationToken cancellationToken = default);
 
     Task<FiscalDocument?> FindDomainByIdAsync(
+        Guid id,
+        string tenantId,
+        CancellationToken cancellationToken = default);
+
+    Task<FiscalDocument?> TryStartProcessingAsync(
         Guid id,
         string tenantId,
         CancellationToken cancellationToken = default);
@@ -28,6 +33,6 @@ public interface IFiscalDocumentRepository
         CancellationToken cancellationToken = default);
 
     Task<PagedResult<FiscalDocumentDetails>> ListAsync(
-    ListFiscalDocumentsQuery query,
-    CancellationToken cancellationToken = default);
+        ListFiscalDocumentsQuery query,
+        CancellationToken cancellationToken = default);
 }
