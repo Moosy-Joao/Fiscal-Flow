@@ -38,6 +38,16 @@ public sealed class MongoDbContext
         _database = client.GetDatabase(DatabaseName);
     }
 
+    public IMongoCollection<TDocument> GetCollection<TDocument>(
+    string collectionName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            collectionName);
+
+        return _database.GetCollection<TDocument>(
+            collectionName);
+    }
+
     public async Task PingAsync(
         CancellationToken cancellationToken = default)
     {

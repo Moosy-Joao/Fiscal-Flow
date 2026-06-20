@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FiscalFlow.Domain\FiscalFlow.Domain.csproj" />
+    <ProjectReference Include="..\FiscalFlow.Application\FiscalFlow.Application.csproj" />
   </ItemGroup>
 
 </Project>

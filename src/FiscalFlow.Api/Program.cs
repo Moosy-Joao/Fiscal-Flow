@@ -1,3 +1,5 @@
+using FiscalFlow.Application.Documents;
+using FiscalFlow.Infrastructure.Documents;
 using FiscalFlow.Infrastructure.MongoDb;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,6 +23,13 @@ if (mongoDbOptions is null
 
 builder.Services.AddSingleton(mongoDbOptions);
 builder.Services.AddSingleton<MongoDbContext>();
+
+builder.Services.AddSingleton<
+    IFiscalDocumentRepository,
+    FiscalDocumentRepository>();
+
+builder.Services.AddScoped<
+    CreateFiscalDocumentService>();
 
 var app = builder.Build();
 
