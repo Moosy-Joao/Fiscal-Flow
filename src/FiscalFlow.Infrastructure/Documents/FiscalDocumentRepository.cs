@@ -89,32 +89,71 @@ public sealed class FiscalDocumentRepository
             tenantId,
             cancellationToken);
 
-        if (model is null)
-        {
-            return null;
-        }
+        return model is null ? null : MapToDomain(model);
+    }
 
-        if (!Enum.TryParse<DocumentProcessingStatus>(
-                model.Status,
-                ignoreCase: true,
-                out var status))
-        {
-            throw new InvalidOperationException(
-                $"O status '{model.Status}' armazenado no MongoDB é inválido.");
-        }
+    public async Task<FiscalDocument?> TryStartProcessingAsync(
+        Guid id,
+        string tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
 
-        return FiscalDocument.Rehydrate(
-            Guid.Parse(model.Id),
-            model.TenantId,
-            model.ExternalDocumentId,
-            status,
-            ToDateTimeOffset(model.ReceivedAtUtc),
-            model.ProcessedAtUtc is null
-                ? null
-                : ToDateTimeOffset(model.ProcessedAtUtc.Value),
-            model.FailureReason,
-            model.XmlContent,
-            MapToFiscalData(model));
+        var filterBuilder =
+            Builders<FiscalDocumentMongoModel>.Filter;
+
+        var filter = filterBuilder.And(
+            filterBuilder.Eq(
+                document => document.Id,
+                id.ToString()),
+            filterBuilder.Eq(
+                document => document.TenantId,
+                tenantId.Trim()),
+            filterBuilder.In(
+                document => document.Status,
+                [
+                    DocumentProcessingStatus.Received.ToString(),
+                    DocumentProcessingStatus.Failed.ToString()
+                ]));
+
+        var updateBuilder =
+            Builders<FiscalDocumentMongoModel>.Update;
+
+        var update = updateBuilder.Combine(
+            updateBuilder.Set(
+                document => document.Status,
+                DocumentProcessingStatus.Processing.ToString()),
+            updateBuilder.Unset(
+                document => document.ProcessedAtUtc),
+            updateBuilder.Unset(
+                document => document.FailureReason),
+            updateBuilder.Unset(
+                document => document.AccessKey),
+            updateBuilder.Unset(
+                document => document.IssuerDocument),
+            updateBuilder.Unset(
+                document => document.IssuerName),
+            updateBuilder.Unset(
+                document => document.RecipientDocument),
+            updateBuilder.Unset(
+                document => document.RecipientName),
+            updateBuilder.Unset(
+                document => document.TotalValue),
+            updateBuilder.Unset(
+                document => document.IssuedAt));
+
+        var model = await _collection.FindOneAndUpdateAsync(
+            filter,
+            update,
+            new FindOneAndUpdateOptions<
+                FiscalDocumentMongoModel,
+                FiscalDocumentMongoModel>
+            {
+                ReturnDocument = ReturnDocument.After
+            },
+            cancellationToken);
+
+        return model is null ? null : MapToDomain(model);
     }
 
     public async Task UpdateAsync(
@@ -220,6 +259,32 @@ public sealed class FiscalDocumentRepository
             ProcessedAtUtc = document.ProcessedAtUtc?.UtcDateTime,
             FailureReason = document.FailureReason
         };
+    }
+
+    private static FiscalDocument MapToDomain(
+        FiscalDocumentMongoModel model)
+    {
+        if (!Enum.TryParse<DocumentProcessingStatus>(
+                model.Status,
+                ignoreCase: true,
+                out var status))
+        {
+            throw new InvalidOperationException(
+                $"O status '{model.Status}' armazenado no MongoDB é inválido.");
+        }
+
+        return FiscalDocument.Rehydrate(
+            Guid.Parse(model.Id),
+            model.TenantId,
+            model.ExternalDocumentId,
+            status,
+            ToDateTimeOffset(model.ReceivedAtUtc),
+            model.ProcessedAtUtc is null
+                ? null
+                : ToDateTimeOffset(model.ProcessedAtUtc.Value),
+            model.FailureReason,
+            model.XmlContent,
+            MapToFiscalData(model));
     }
 
     private static FiscalDocumentDetails MapToDetails(
