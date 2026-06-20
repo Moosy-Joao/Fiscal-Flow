@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
 
 namespace FiscalFlow.IntegrationTests;
 
@@ -17,18 +16,7 @@ public sealed class HealthEndpointTests
         _client = factory
             .WithWebHostBuilder(builder =>
             {
-                builder.ConfigureAppConfiguration(
-                    (_, configuration) =>
-                    {
-                        configuration.AddInMemoryCollection(
-                            new Dictionary<string, string?>
-                            {
-                                ["MongoDb:InitializeIndexes"] =
-                                    "false",
-                                ["RabbitMq:Enabled"] =
-                                    "false"
-                            });
-                    });
+                builder.UseEnvironment("Testing");
             })
             .CreateClient();
     }
