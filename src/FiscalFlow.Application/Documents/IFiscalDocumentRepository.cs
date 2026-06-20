@@ -28,6 +28,12 @@ public interface IFiscalDocumentRepository
         string tenantId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyCollection<FiscalDocument>>
+        ClaimFailedForReprocessingAsync(
+            int maximumAttempts,
+            int batchSize,
+            CancellationToken cancellationToken = default);
+
     Task UpdateAsync(
         FiscalDocument document,
         CancellationToken cancellationToken = default);
