@@ -16,7 +16,8 @@ public sealed class HealthEndpointTests
         _client = factory
             .WithWebHostBuilder(builder =>
             {
-                builder.UseEnvironment("Testing");
+                builder.UseEnvironment(
+                    IntegrationTestSettings.EnvironmentName);
             })
             .CreateClient();
     }
