@@ -145,4 +145,56 @@ public sealed class ProcessFiscalDocumentServiceTests
         Assert.Null(document.FailureReason);
         Assert.NotNull(document.FiscalData);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_ShouldParseOnlyOnce_WhenCalledTwice()
+    {
+        var repository = new FakeFiscalDocumentRepository();
+        var parser = new CountingXmlParser();
+        var service = new ProcessFiscalDocumentService(
+            repository,
+            parser);
+
+        var document = new FiscalDocument(
+            "empresa-demo",
+            "NFE-REENTREGA",
+            xmlContent: ValidXml);
+
+        await repository.InsertAsync(document);
+
+        var command = new ProcessFiscalDocumentCommand(
+            document.Id,
+            document.TenantId);
+
+        await service.ExecuteAsync(command);
+
+        var firstProcessedAtUtc = document.ProcessedAtUtc;
+        var firstFiscalData = document.FiscalData;
+
+        await service.ExecuteAsync(command);
+
+        Assert.Equal(1, parser.CallCount);
+        Assert.Equal(
+            DocumentProcessingStatus.Processed,
+            document.Status);
+        Assert.Equal(
+            firstProcessedAtUtc,
+            document.ProcessedAtUtc);
+        Assert.Same(firstFiscalData, document.FiscalData);
+    }
+
+    private sealed class CountingXmlParser :
+        IFiscalDocumentXmlParser
+    {
+        private readonly IFiscalDocumentXmlParser _inner =
+            new FiscalDocumentXmlParser();
+
+        public int CallCount { get; private set; }
+
+        public FiscalDocumentXmlData Parse(string xml)
+        {
+            CallCount++;
+            return _inner.Parse(xml);
+        }
+    }
 }
