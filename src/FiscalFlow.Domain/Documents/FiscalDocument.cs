@@ -1,34 +1,14 @@
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
-
 namespace FiscalFlow.Domain.Documents;
 
 public sealed class FiscalDocument
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; init; } = ObjectId.GenerateNewId().ToString();
-
-    [BsonRequired]
-    public string TenantId { get; init; } = string.Empty;
-
-    [BsonRequired]
-    public string ExternalDocumentId { get; init; } = string.Empty;
-
-    public string PayloadJson { get; init; } = string.Empty;
-
-    [BsonRequired]
-    public DocumentProcessingStatus Status { get; private set; } = DocumentProcessingStatus.Received;
-
-    [BsonRequired]
-    public DateTimeOffset ReceivedAtUtc { get; init; } = DateTimeOffset.UtcNow;
-
+    public Guid Id { get; }
+    public string TenantId { get; }
+    public string ExternalDocumentId { get; }
+    public DocumentProcessingStatus Status { get; private set; }
+    public DateTimeOffset ReceivedAtUtc { get; }
     public DateTimeOffset? ProcessedAtUtc { get; private set; }
     public string? FailureReason { get; private set; }
-
-    public FiscalDocument()
-    {
-    }
 
     public FiscalDocument(
         string tenantId,
@@ -38,8 +18,10 @@ public sealed class FiscalDocument
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
         ArgumentException.ThrowIfNullOrWhiteSpace(externalDocumentId);
 
+        Id = Guid.NewGuid();
         TenantId = tenantId.Trim();
         ExternalDocumentId = externalDocumentId.Trim();
+        Status = DocumentProcessingStatus.Received;
         ReceivedAtUtc = receivedAtUtc ?? DateTimeOffset.UtcNow;
     }
 
