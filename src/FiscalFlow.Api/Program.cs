@@ -37,6 +37,9 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     UpdateFiscalDocumentStatusService>();
 
+builder.Services.AddScoped<
+    ListFiscalDocumentsService>();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
