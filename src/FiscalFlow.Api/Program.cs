@@ -1,7 +1,9 @@
+using FiscalFlow.Api.Tenancy;
 using FiscalFlow.Application.Documents;
 using FiscalFlow.Infrastructure.Documents;
 using FiscalFlow.Infrastructure.MongoDb;
-using FiscalFlow.Api.Tenancy;
+using FiscalFlow.Infrastructure.RabbitMq;
+using FiscalFlow.Application.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +24,31 @@ if (mongoDbOptions is null
         "A seção MongoDb não foi configurada corretamente.");
 }
 
+var rabbitMqOptions = builder.Configuration
+    .GetSection(RabbitMqOptions.SectionName)
+    .Get<RabbitMqOptions>();
+
+if (rabbitMqOptions is null
+    || string.IsNullOrWhiteSpace(
+        rabbitMqOptions.HostName)
+    || string.IsNullOrWhiteSpace(
+        rabbitMqOptions.UserName)
+    || string.IsNullOrWhiteSpace(
+        rabbitMqOptions.Password)
+    || string.IsNullOrWhiteSpace(
+        rabbitMqOptions.VirtualHost)
+    || string.IsNullOrWhiteSpace(
+        rabbitMqOptions.ExchangeName)
+    || string.IsNullOrWhiteSpace(
+        rabbitMqOptions.QueueName)
+    || string.IsNullOrWhiteSpace(
+        rabbitMqOptions.RoutingKey)
+    || rabbitMqOptions.Port <= 0)
+{
+    throw new InvalidOperationException(
+        "A seção RabbitMq não foi configurada corretamente.");
+}
+
 builder.Services.AddSingleton(mongoDbOptions);
 builder.Services.AddSingleton<MongoDbContext>();
 
@@ -31,6 +58,18 @@ builder.Services.AddSingleton<
 builder.Services.AddSingleton<
     IFiscalDocumentRepository,
     FiscalDocumentRepository>();
+
+builder.Services.AddSingleton(rabbitMqOptions);
+
+builder.Services.AddSingleton<
+    RabbitMqConnectionFactory>();
+
+builder.Services.AddSingleton<
+    RabbitMqTopologyInitializer>();
+
+builder.Services.AddSingleton<
+    IFiscalDocumentReceivedPublisher,
+    RabbitMqFiscalDocumentReceivedPublisher>();
 
 builder.Services.AddScoped<
     CreateFiscalDocumentService>();
@@ -57,6 +96,12 @@ if (mongoDbOptions.InitializeIndexes)
     await indexManager.EnsureCreatedAsync();
 }
 
+var rabbitMqTopologyInitializer =
+    app.Services.GetRequiredService<
+        RabbitMqTopologyInitializer>();
+
+await rabbitMqTopologyInitializer.InitializeAsync();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -65,7 +110,6 @@ if (app.Environment.IsDevelopment())
 app.UseMiddleware<TenantMiddleware>();
 
 app.MapControllers();
-
 
 app.Run();
 

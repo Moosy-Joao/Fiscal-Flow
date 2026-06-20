@@ -1,15 +1,25 @@
+using FiscalFlow.Application.Messaging;
 using FiscalFlow.Domain.Documents;
 
 namespace FiscalFlow.Application.Documents;
 
 public sealed class CreateFiscalDocumentService
 {
-    private readonly IFiscalDocumentRepository _repository;
+    private readonly IFiscalDocumentRepository
+        _repository;
+
+    private readonly IFiscalDocumentReceivedPublisher
+        _publisher;
 
     public CreateFiscalDocumentService(
-        IFiscalDocumentRepository repository)
+        IFiscalDocumentRepository repository,
+        IFiscalDocumentReceivedPublisher publisher)
     {
+        ArgumentNullException.ThrowIfNull(repository);
+        ArgumentNullException.ThrowIfNull(publisher);
+
         _repository = repository;
+        _publisher = publisher;
     }
 
     public async Task<CreateFiscalDocumentResult> ExecuteAsync(
@@ -25,6 +35,7 @@ public sealed class CreateFiscalDocumentService
             command.ExternalDocumentId);
 
         var tenantId = command.TenantId.Trim();
+
         var externalDocumentId =
             command.ExternalDocumentId.Trim();
 
@@ -50,6 +61,18 @@ public sealed class CreateFiscalDocumentService
         {
             await _repository.InsertAsync(
                 document,
+                cancellationToken);
+
+            var message =
+                new FiscalDocumentReceivedMessage(
+                    document.Id,
+                    document.TenantId,
+                    document.ExternalDocumentId,
+                    document.ReceivedAtUtc,
+                    Guid.NewGuid());
+
+            await _publisher.PublishAsync(
+                message,
                 cancellationToken);
 
             return new CreateFiscalDocumentResult(
