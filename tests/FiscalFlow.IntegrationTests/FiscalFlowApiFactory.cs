@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace FiscalFlow.IntegrationTests;
 
-internal sealed class FiscalFlowApiFactory :
+public sealed class FiscalFlowApiFactory :
     WebApplicationFactory<Program>
 {
     public InMemoryFiscalDocumentRepository Repository
