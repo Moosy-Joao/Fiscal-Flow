@@ -6,6 +6,7 @@
     <Project Path="src/FiscalFlow.Infrastructure/FiscalFlow.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/FiscalFlow.Tests/FiscalFlow.Tests.csproj" />
+    <Project Path="tests/FiscalFlow.UnitTests/FiscalFlow.UnitTests.csproj" />
+    <Project Path="tests/FiscalFlow.IntegrationTests/FiscalFlow.IntegrationTests.csproj" />
   </Folder>
 </Solution>
