@@ -1,25 +1,17 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <ItemGroup>
-    <ProjectReference Include="..\FiscalFlow.Application\FiscalFlow.Application.csproj" />
-    <ProjectReference Include="..\FiscalFlow.Domain\FiscalFlow.Domain.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Hangfire.AspNetCore" Version="1.8.23" />
-    <PackageReference Include="Hangfire.Mongo" Version="1.16.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.9" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.9" />
-    <PackageReference Include="MongoDB.Driver" Version="3.9.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="RabbitMQ.Client" Version="6.8.1" />
-  </ItemGroup>
-
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MongoDB.Driver" Version="3.9.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FiscalFlow.Domain\FiscalFlow.Domain.csproj" />
+  </ItemGroup>
 
 </Project>
