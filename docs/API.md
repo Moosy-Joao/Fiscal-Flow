@@ -30,7 +30,7 @@ Resposta `200 OK`:
 }
 ```
 
-## Criar documento
+## Criar documento com JSON
 
 ### `POST /api/fiscal-documents`
 
@@ -45,7 +45,8 @@ Body:
 
 ```json
 {
-  "externalDocumentId": "NFE-123"
+  "externalDocumentId": "NFE-123",
+  "xmlContent": "<nfeProc>...</nfeProc>"
 }
 ```
 
@@ -74,6 +75,57 @@ Repetição da mesma combinação de tenant e identificador externo: `200 OK`.
   "wasCreated": false
 }
 ```
+
+Enquanto um documento existente permanecer em `Received`, uma nova requisição também tenta republicar sua mensagem no RabbitMQ. Isso permite recuperar documentos persistidos durante uma indisponibilidade temporária do broker sem criar duplicidades no MongoDB.
+
+## Enviar arquivo XML
+
+### `POST /api/fiscal-documents/upload`
+
+O endpoint recebe `multipart/form-data` e aplica o mesmo fluxo de persistência, idempotência e processamento assíncrono da criação com JSON.
+
+Campos do formulário:
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `externalDocumentId` | texto | sim | Identificador do documento no sistema de origem |
+| `file` | arquivo | sim | Arquivo fiscal com extensão `.xml` |
+
+Exemplo com `curl`:
+
+```bash
+curl -X POST http://localhost:5298/api/fiscal-documents/upload \
+  -H "X-Tenant-Id: empresa-a" \
+  -F "externalDocumentId=NFE-123" \
+  -F "file=@nota-fiscal.xml;type=application/xml"
+```
+
+Validações realizadas antes da persistência:
+
+- extensão `.xml`, sem diferenciar letras maiúsculas e minúsculas;
+- arquivo não vazio;
+- limite padrão de 2 MB;
+- limite aplicado ao tamanho declarado e aos bytes realmente lidos;
+- XML bem formado;
+- DTD e resolução de entidades externas desabilitadas;
+- presença da estrutura fiscal esperada, incluindo `infNFe` e os campos obrigatórios processados pela aplicação.
+
+O limite pode ser alterado em configuração:
+
+```json
+{
+  "FiscalDocumentUpload": {
+    "MaxFileSizeBytes": 2097152
+  }
+}
+```
+
+Resultados:
+
+- `201 Created`: arquivo validado e novo documento criado;
+- `200 OK`: documento idempotente já existente;
+- `400 Bad Request`: extensão, conteúdo ou estrutura fiscal inválida;
+- `413 Payload Too Large`: arquivo acima do limite permitido.
 
 ## Listar documentos
 
@@ -106,7 +158,8 @@ Resposta `200 OK`:
       "status": "Received",
       "receivedAtUtc": "2026-06-20T00:00:00+00:00",
       "processedAtUtc": null,
-      "failureReason": null
+      "failureReason": null,
+      "fiscalData": null
     }
   ],
   "page": 1,

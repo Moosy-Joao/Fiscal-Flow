@@ -1,6 +1,8 @@
+using FiscalFlow.Api.Configuration;
 using FiscalFlow.Api.Contracts;
 using FiscalFlow.Api.Tenancy;
 using FiscalFlow.Application.Documents;
+using FiscalFlow.Application.Documents.Xml;
 using FiscalFlow.Domain.Documents;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,8 +10,8 @@ namespace FiscalFlow.Api.Controllers;
 
 [ApiController]
 [Route("api/fiscal-documents")]
-public sealed class FiscalDocumentsController
-    : ControllerBase
+public sealed class FiscalDocumentsController :
+    ControllerBase
 {
     private readonly CreateFiscalDocumentService
         _createService;
@@ -23,6 +25,12 @@ public sealed class FiscalDocumentsController
     private readonly ListFiscalDocumentsService
         _listService;
 
+    private readonly FiscalDocumentXmlFileReader
+        _xmlFileReader;
+
+    private readonly FiscalDocumentUploadOptions
+        _uploadOptions;
+
     private readonly TenantContext
         _tenantContext;
 
@@ -31,46 +39,92 @@ public sealed class FiscalDocumentsController
         GetFiscalDocumentByIdService getByIdService,
         UpdateFiscalDocumentStatusService updateStatusService,
         ListFiscalDocumentsService listService,
+        FiscalDocumentXmlFileReader xmlFileReader,
+        FiscalDocumentUploadOptions uploadOptions,
         TenantContext tenantContext)
     {
         _createService = createService;
         _getByIdService = getByIdService;
         _updateStatusService = updateStatusService;
         _listService = listService;
+        _xmlFileReader = xmlFileReader;
+        _uploadOptions = uploadOptions;
         _tenantContext = tenantContext;
     }
 
     [HttpPost]
     [ProducesResponseType(
-    typeof(CreateFiscalDocumentResult),
-    StatusCodes.Status201Created)]
+        typeof(CreateFiscalDocumentResult),
+        StatusCodes.Status201Created)]
     [ProducesResponseType(
-    typeof(CreateFiscalDocumentResult),
-    StatusCodes.Status200OK)]
+        typeof(CreateFiscalDocumentResult),
+        StatusCodes.Status200OK)]
     [ProducesResponseType(
-    StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Create(
-    CreateFiscalDocumentRequest request,
-    CancellationToken cancellationToken)
+        StatusCodes.Status400BadRequest)]
+    public Task<IActionResult> Create(
+        CreateFiscalDocumentRequest request,
+        CancellationToken cancellationToken)
     {
-        var command = new CreateFiscalDocumentCommand(
-    _tenantContext.TenantId,
-    request.ExternalDocumentId,
-    request.XmlContent);
-
-        var result = await _createService.ExecuteAsync(
-            command,
+        return CreateFromContentAsync(
+            request.ExternalDocumentId,
+            request.XmlContent,
             cancellationToken);
+    }
 
-        if (!result.WasCreated)
+    [HttpPost("upload")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(
+        typeof(CreateFiscalDocumentResult),
+        StatusCodes.Status201Created)]
+    [ProducesResponseType(
+        typeof(CreateFiscalDocumentResult),
+        StatusCodes.Status200OK)]
+    [ProducesResponseType(
+        StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(
+        StatusCodes.Status413PayloadTooLarge)]
+    public async Task<IActionResult> Upload(
+        [FromForm] UploadFiscalDocumentRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
         {
-            return Ok(result);
-        }
+            await using var stream =
+                request.File.OpenReadStream();
 
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = result.Id },
-            result);
+            var xmlContent =
+                await _xmlFileReader.ReadAsync(
+                    request.File.FileName,
+                    request.File.Length,
+                    stream,
+                    _uploadOptions.MaxFileSizeBytes,
+                    cancellationToken);
+
+            return await CreateFromContentAsync(
+                request.ExternalDocumentId,
+                xmlContent,
+                cancellationToken);
+        }
+        catch (FiscalDocumentUploadTooLargeException exception)
+        {
+            return StatusCode(
+                StatusCodes.Status413PayloadTooLarge,
+                new ProblemDetails
+                {
+                    Title = "Arquivo XML muito grande",
+                    Detail = exception.Message,
+                    Status =
+                        StatusCodes.Status413PayloadTooLarge
+                });
+        }
+        catch (FiscalDocumentUploadValidationException exception)
+        {
+            ModelState.AddModelError(
+                nameof(request.File),
+                exception.Message);
+
+            return ValidationProblem(ModelState);
+        }
     }
 
     [HttpGet]
@@ -212,5 +266,30 @@ public sealed class FiscalDocumentsController
                     StatusCodes.Status409Conflict
             });
         }
+    }
+
+    private async Task<IActionResult> CreateFromContentAsync(
+        string externalDocumentId,
+        string xmlContent,
+        CancellationToken cancellationToken)
+    {
+        var command = new CreateFiscalDocumentCommand(
+            _tenantContext.TenantId,
+            externalDocumentId,
+            xmlContent);
+
+        var result = await _createService.ExecuteAsync(
+            command,
+            cancellationToken);
+
+        if (!result.WasCreated)
+        {
+            return Ok(result);
+        }
+
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = result.Id },
+            result);
     }
 }
