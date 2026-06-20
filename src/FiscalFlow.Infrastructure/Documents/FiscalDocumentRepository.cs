@@ -8,18 +8,15 @@ namespace FiscalFlow.Infrastructure.Documents;
 public sealed class FiscalDocumentRepository
     : IFiscalDocumentRepository
 {
-    private const string CollectionName =
-        "fiscalDocuments";
+    private const string CollectionName = "fiscalDocuments";
 
     private readonly IMongoCollection<FiscalDocumentMongoModel>
         _collection;
 
-    public FiscalDocumentRepository(
-        MongoDbContext mongoDbContext)
+    public FiscalDocumentRepository(MongoDbContext mongoDbContext)
     {
-        _collection =
-            mongoDbContext.GetCollection<FiscalDocumentMongoModel>(
-                CollectionName);
+        _collection = mongoDbContext
+            .GetCollection<FiscalDocumentMongoModel>(CollectionName);
     }
 
     public async Task InsertAsync(
@@ -28,12 +25,10 @@ public sealed class FiscalDocumentRepository
     {
         ArgumentNullException.ThrowIfNull(document);
 
-        var mongoModel = MapToMongoModel(document);
-
         try
         {
             await _collection.InsertOneAsync(
-                mongoModel,
+                MapToMongoModel(document),
                 cancellationToken: cancellationToken);
         }
         catch (MongoWriteException exception)
@@ -52,28 +47,21 @@ public sealed class FiscalDocumentRepository
         string tenantId,
         CancellationToken cancellationToken = default)
     {
-        var mongoModel = await FindMongoModelByIdAsync(
+        var model = await FindMongoModelByIdAsync(
             id,
             tenantId,
             cancellationToken);
 
-        if (mongoModel is null)
-        {
-            return null;
-        }
-
-        return MapToDetails(mongoModel);
+        return model is null ? null : MapToDetails(model);
     }
 
     public async Task<FiscalDocumentDetails?>
-    FindByExternalDocumentIdAsync(
-        string tenantId,
-        string externalDocumentId,
-        CancellationToken cancellationToken = default)
+        FindByExternalDocumentIdAsync(
+            string tenantId,
+            string externalDocumentId,
+            CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(
-            tenantId);
-
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
         ArgumentException.ThrowIfNullOrWhiteSpace(
             externalDocumentId);
 
@@ -81,16 +69,14 @@ public sealed class FiscalDocumentRepository
         var normalizedExternalDocumentId =
             externalDocumentId.Trim();
 
-        var mongoModel = await _collection
+        var model = await _collection
             .Find(document =>
                 document.TenantId == normalizedTenantId
                 && document.ExternalDocumentId
                     == normalizedExternalDocumentId)
             .FirstOrDefaultAsync(cancellationToken);
 
-        return mongoModel is null
-            ? null
-            : MapToDetails(mongoModel);
+        return model is null ? null : MapToDetails(model);
     }
 
     public async Task<FiscalDocument?> FindDomainByIdAsync(
@@ -98,38 +84,37 @@ public sealed class FiscalDocumentRepository
         string tenantId,
         CancellationToken cancellationToken = default)
     {
-        var mongoModel = await FindMongoModelByIdAsync(
+        var model = await FindMongoModelByIdAsync(
             id,
             tenantId,
             cancellationToken);
 
-        if (mongoModel is null)
+        if (model is null)
         {
             return null;
         }
 
         if (!Enum.TryParse<DocumentProcessingStatus>(
-                mongoModel.Status,
+                model.Status,
                 ignoreCase: true,
                 out var status))
         {
             throw new InvalidOperationException(
-                $"O status '{mongoModel.Status}' armazenado no MongoDB é inválido.");
+                $"O status '{model.Status}' armazenado no MongoDB é inválido.");
         }
 
         return FiscalDocument.Rehydrate(
-            Guid.Parse(mongoModel.Id),
-            mongoModel.TenantId,
-            mongoModel.ExternalDocumentId,
+            Guid.Parse(model.Id),
+            model.TenantId,
+            model.ExternalDocumentId,
             status,
-            ToDateTimeOffset(
-                mongoModel.ReceivedAtUtc),
-            mongoModel.ProcessedAtUtc is null
+            ToDateTimeOffset(model.ReceivedAtUtc),
+            model.ProcessedAtUtc is null
                 ? null
-                : ToDateTimeOffset(
-                    mongoModel.ProcessedAtUtc.Value),
-            mongoModel.FailureReason,
-mongoModel.XmlContent);
+                : ToDateTimeOffset(model.ProcessedAtUtc.Value),
+            model.FailureReason,
+            model.XmlContent,
+            MapToFiscalData(model));
     }
 
     public async Task UpdateAsync(
@@ -138,14 +123,13 @@ mongoModel.XmlContent);
     {
         ArgumentNullException.ThrowIfNull(document);
 
-        var mongoModel = MapToMongoModel(document);
+        var model = MapToMongoModel(document);
 
         var result = await _collection.ReplaceOneAsync(
-            storedDocument =>
-                storedDocument.Id == mongoModel.Id
-                && storedDocument.TenantId
-                    == mongoModel.TenantId,
-            mongoModel,
+            stored =>
+                stored.Id == model.Id
+                && stored.TenantId == model.TenantId,
+            model,
             cancellationToken: cancellationToken);
 
         if (result.MatchedCount == 0)
@@ -160,13 +144,13 @@ mongoModel.XmlContent);
             ListFiscalDocumentsQuery query,
             CancellationToken cancellationToken = default)
     {
-        var filterBuilder =
+        var builder =
             Builders<FiscalDocumentMongoModel>.Filter;
 
         var filters =
             new List<FilterDefinition<FiscalDocumentMongoModel>>
             {
-                filterBuilder.Eq(
+                builder.Eq(
                     document => document.TenantId,
                     query.TenantId)
             };
@@ -174,34 +158,26 @@ mongoModel.XmlContent);
         if (query.Status is not null)
         {
             filters.Add(
-                filterBuilder.Eq(
+                builder.Eq(
                     document => document.Status,
                     query.Status.Value.ToString()));
         }
 
-        var filter = filterBuilder.And(filters);
+        var filter = builder.And(filters);
 
-        var totalItems =
-            await _collection.CountDocumentsAsync(
-                filter,
-                cancellationToken: cancellationToken);
+        var totalItems = await _collection.CountDocumentsAsync(
+            filter,
+            cancellationToken: cancellationToken);
 
-        var mongoModels = await _collection
+        var models = await _collection
             .Find(filter)
-            .SortByDescending(
-                document => document.ReceivedAtUtc)
-            .Skip(
-                (query.Page - 1)
-                * query.PageSize)
+            .SortByDescending(document => document.ReceivedAtUtc)
+            .Skip((query.Page - 1) * query.PageSize)
             .Limit(query.PageSize)
             .ToListAsync(cancellationToken);
 
-        var items = mongoModels
-            .Select(MapToDetails)
-            .ToList();
-
         return new PagedResult<FiscalDocumentDetails>(
-            items,
+            models.Select(MapToDetails).ToList(),
             query.Page,
             query.PageSize,
             totalItems);
@@ -229,43 +205,84 @@ mongoModel.XmlContent);
         {
             Id = document.Id.ToString(),
             TenantId = document.TenantId,
-            ExternalDocumentId =
-                document.ExternalDocumentId,
+            ExternalDocumentId = document.ExternalDocumentId,
             XmlContent = document.XmlContent,
+            AccessKey = document.FiscalData?.AccessKey,
+            IssuerDocument = document.FiscalData?.IssuerDocument,
+            IssuerName = document.FiscalData?.IssuerName,
+            RecipientDocument =
+                document.FiscalData?.RecipientDocument,
+            RecipientName = document.FiscalData?.RecipientName,
+            TotalValue = document.FiscalData?.TotalValue,
+            IssuedAt = document.FiscalData?.IssuedAt.UtcDateTime,
             Status = document.Status.ToString(),
-            ReceivedAtUtc =
-                document.ReceivedAtUtc.UtcDateTime,
-            ProcessedAtUtc =
-                document.ProcessedAtUtc?.UtcDateTime,
-            FailureReason =
-                document.FailureReason
+            ReceivedAtUtc = document.ReceivedAtUtc.UtcDateTime,
+            ProcessedAtUtc = document.ProcessedAtUtc?.UtcDateTime,
+            FailureReason = document.FailureReason
         };
     }
 
     private static FiscalDocumentDetails MapToDetails(
-        FiscalDocumentMongoModel mongoModel)
+        FiscalDocumentMongoModel model)
     {
+        var fiscalData = MapToFiscalData(model);
+
         return new FiscalDocumentDetails(
-            Guid.Parse(mongoModel.Id),
-            mongoModel.TenantId,
-            mongoModel.ExternalDocumentId,
-            mongoModel.Status,
-            ToDateTimeOffset(
-                mongoModel.ReceivedAtUtc),
-            mongoModel.ProcessedAtUtc is null
+            Guid.Parse(model.Id),
+            model.TenantId,
+            model.ExternalDocumentId,
+            model.Status,
+            ToDateTimeOffset(model.ReceivedAtUtc),
+            model.ProcessedAtUtc is null
                 ? null
-                : ToDateTimeOffset(
-                    mongoModel.ProcessedAtUtc.Value),
-            mongoModel.FailureReason);
+                : ToDateTimeOffset(model.ProcessedAtUtc.Value),
+            model.FailureReason,
+            fiscalData is null
+                ? null
+                : MapToDetails(fiscalData));
+    }
+
+    private static FiscalDocumentDataDetails MapToDetails(
+        FiscalDocumentData data)
+    {
+        return new FiscalDocumentDataDetails(
+            data.AccessKey,
+            data.IssuerDocument,
+            data.IssuerName,
+            data.RecipientDocument,
+            data.RecipientName,
+            data.TotalValue,
+            data.IssuedAt);
+    }
+
+    private static FiscalDocumentData? MapToFiscalData(
+        FiscalDocumentMongoModel model)
+    {
+        if (string.IsNullOrWhiteSpace(model.AccessKey)
+            || string.IsNullOrWhiteSpace(model.IssuerDocument)
+            || string.IsNullOrWhiteSpace(model.IssuerName)
+            || string.IsNullOrWhiteSpace(model.RecipientDocument)
+            || string.IsNullOrWhiteSpace(model.RecipientName)
+            || model.TotalValue is null
+            || model.IssuedAt is null)
+        {
+            return null;
+        }
+
+        return new FiscalDocumentData(
+            model.AccessKey,
+            model.IssuerDocument,
+            model.IssuerName,
+            model.RecipientDocument,
+            model.RecipientName,
+            model.TotalValue.Value,
+            ToDateTimeOffset(model.IssuedAt.Value));
     }
 
     private static DateTimeOffset ToDateTimeOffset(
-        DateTime dateTime)
+        DateTime value)
     {
-        var utcDateTime = DateTime.SpecifyKind(
-            dateTime,
-            DateTimeKind.Utc);
-
-        return new DateTimeOffset(utcDateTime);
+        return new DateTimeOffset(
+            DateTime.SpecifyKind(value, DateTimeKind.Utc));
     }
 }
