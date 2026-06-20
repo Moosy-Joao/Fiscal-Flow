@@ -32,9 +32,6 @@ public sealed class CreateFiscalDocumentService
             command.TenantId);
 
         ArgumentException.ThrowIfNullOrWhiteSpace(
-    command.TenantId);
-
-        ArgumentException.ThrowIfNullOrWhiteSpace(
             command.ExternalDocumentId);
 
         ArgumentException.ThrowIfNullOrWhiteSpace(
@@ -58,6 +55,10 @@ public sealed class CreateFiscalDocumentService
 
         if (existingDocument is not null)
         {
+            await PublishIfPendingAsync(
+                existingDocument,
+                cancellationToken);
+
             return MapToResult(
                 existingDocument,
                 wasCreated: false);
@@ -74,16 +75,11 @@ public sealed class CreateFiscalDocumentService
                 document,
                 cancellationToken);
 
-            var message =
-                new FiscalDocumentReceivedMessage(
-                    document.Id,
-                    document.TenantId,
-                    document.ExternalDocumentId,
-                    document.ReceivedAtUtc,
-                    Guid.NewGuid());
-
-            await _publisher.PublishAsync(
-                message,
+            await PublishAsync(
+                document.Id,
+                document.TenantId,
+                document.ExternalDocumentId,
+                document.ReceivedAtUtc,
                 cancellationToken);
 
             return new CreateFiscalDocumentResult(
@@ -108,10 +104,54 @@ public sealed class CreateFiscalDocumentService
                 throw;
             }
 
+            await PublishIfPendingAsync(
+                existingDocument,
+                cancellationToken);
+
             return MapToResult(
                 existingDocument,
                 wasCreated: false);
         }
+    }
+
+    private Task PublishIfPendingAsync(
+        FiscalDocumentDetails document,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(
+                document.Status,
+                DocumentProcessingStatus.Received.ToString(),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return Task.CompletedTask;
+        }
+
+        return PublishAsync(
+            document.Id,
+            document.TenantId,
+            document.ExternalDocumentId,
+            document.ReceivedAtUtc,
+            cancellationToken);
+    }
+
+    private Task PublishAsync(
+        Guid documentId,
+        string tenantId,
+        string externalDocumentId,
+        DateTimeOffset receivedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var message =
+            new FiscalDocumentReceivedMessage(
+                documentId,
+                tenantId,
+                externalDocumentId,
+                receivedAtUtc,
+                Guid.NewGuid());
+
+        return _publisher.PublishAsync(
+            message,
+            cancellationToken);
     }
 
     private static CreateFiscalDocumentResult MapToResult(
