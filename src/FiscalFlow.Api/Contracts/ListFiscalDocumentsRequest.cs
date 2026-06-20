@@ -4,9 +4,6 @@ namespace FiscalFlow.Api.Contracts;
 
 public sealed class ListFiscalDocumentsRequest
 {
-    [Required]
-    public string TenantId { get; init; } = string.Empty;
-
     public string? Status { get; init; }
 
     [Range(1, int.MaxValue)]

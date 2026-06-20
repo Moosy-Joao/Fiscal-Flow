@@ -25,9 +25,16 @@ public sealed class UpdateFiscalDocumentStatusService
                 nameof(command));
         }
 
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            command.TenantId,
+            nameof(command.TenantId));
+
+        var tenantId = command.TenantId.Trim();
+
         var document =
             await _repository.FindDomainByIdAsync(
                 command.Id,
+                tenantId,
                 cancellationToken);
 
         if (document is null)
@@ -47,7 +54,7 @@ public sealed class UpdateFiscalDocumentStatusService
 
             case DocumentProcessingStatus.Failed:
                 if (string.IsNullOrWhiteSpace(
-                    command.FailureReason))
+                        command.FailureReason))
                 {
                     throw new ArgumentException(
                         "O motivo da falha é obrigatório.");
