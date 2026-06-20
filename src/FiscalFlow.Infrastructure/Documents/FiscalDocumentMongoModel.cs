@@ -18,6 +18,34 @@ internal sealed class FiscalDocumentMongoModel
     [BsonIgnoreIfNull]
     public string? XmlContent { get; init; }
 
+    [BsonElement("accessKey")]
+    [BsonIgnoreIfNull]
+    public string? AccessKey { get; init; }
+
+    [BsonElement("issuerDocument")]
+    [BsonIgnoreIfNull]
+    public string? IssuerDocument { get; init; }
+
+    [BsonElement("issuerName")]
+    [BsonIgnoreIfNull]
+    public string? IssuerName { get; init; }
+
+    [BsonElement("recipientDocument")]
+    [BsonIgnoreIfNull]
+    public string? RecipientDocument { get; init; }
+
+    [BsonElement("recipientName")]
+    [BsonIgnoreIfNull]
+    public string? RecipientName { get; init; }
+
+    [BsonElement("totalValue")]
+    [BsonIgnoreIfNull]
+    public decimal? TotalValue { get; init; }
+
+    [BsonElement("issuedAt")]
+    [BsonIgnoreIfNull]
+    public DateTime? IssuedAt { get; init; }
+
     [BsonElement("status")]
     public string Status { get; init; } = string.Empty;
 
