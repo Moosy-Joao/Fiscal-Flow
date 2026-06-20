@@ -65,6 +65,34 @@ public sealed class FiscalDocumentRepository
         return MapToDetails(mongoModel);
     }
 
+    public async Task<FiscalDocumentDetails?>
+    FindByExternalDocumentIdAsync(
+        string tenantId,
+        string externalDocumentId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            tenantId);
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            externalDocumentId);
+
+        var normalizedTenantId = tenantId.Trim();
+        var normalizedExternalDocumentId =
+            externalDocumentId.Trim();
+
+        var mongoModel = await _collection
+            .Find(document =>
+                document.TenantId == normalizedTenantId
+                && document.ExternalDocumentId
+                    == normalizedExternalDocumentId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return mongoModel is null
+            ? null
+            : MapToDetails(mongoModel);
+    }
+
     public async Task<FiscalDocument?> FindDomainByIdAsync(
         Guid id,
         string tenantId,

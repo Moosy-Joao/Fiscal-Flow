@@ -42,42 +42,34 @@ public sealed class FiscalDocumentsController
 
     [HttpPost]
     [ProducesResponseType(
-        typeof(CreateFiscalDocumentResult),
-        StatusCodes.Status201Created)]
+    typeof(CreateFiscalDocumentResult),
+    StatusCodes.Status201Created)]
     [ProducesResponseType(
-        StatusCodes.Status400BadRequest)]
+    typeof(CreateFiscalDocumentResult),
+    StatusCodes.Status200OK)]
     [ProducesResponseType(
-        StatusCodes.Status409Conflict)]
+    StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create(
-        CreateFiscalDocumentRequest request,
-        CancellationToken cancellationToken)
+    CreateFiscalDocumentRequest request,
+    CancellationToken cancellationToken)
     {
         var command = new CreateFiscalDocumentCommand(
             _tenantContext.TenantId,
             request.ExternalDocumentId);
 
-        try
-        {
-            var result = await _createService.ExecuteAsync(
-                command,
-                cancellationToken);
+        var result = await _createService.ExecuteAsync(
+            command,
+            cancellationToken);
 
-            return CreatedAtAction(
-                nameof(GetById),
-                new { id = result.Id },
-                result);
-        }
-        catch (
-            DuplicateFiscalDocumentException exception)
+        if (!result.WasCreated)
         {
-            return Conflict(new ProblemDetails
-            {
-                Title = "Documento fiscal duplicado",
-                Detail = exception.Message,
-                Status =
-                    StatusCodes.Status409Conflict
-            });
+            return Ok(result);
         }
+
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = result.Id },
+            result);
     }
 
     [HttpGet]

@@ -13,6 +13,11 @@ public interface IFiscalDocumentRepository
     string tenantId,
     CancellationToken cancellationToken = default);
 
+    Task<FiscalDocumentDetails?> FindByExternalDocumentIdAsync(
+    string tenantId,
+    string externalDocumentId,
+    CancellationToken cancellationToken = default);
+
     Task<FiscalDocument?> FindDomainByIdAsync(
         Guid id,
         string tenantId,

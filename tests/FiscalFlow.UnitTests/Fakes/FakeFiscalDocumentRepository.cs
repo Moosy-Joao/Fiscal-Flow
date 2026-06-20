@@ -143,4 +143,27 @@ internal sealed class FakeFiscalDocumentRepository
             document.ProcessedAtUtc,
             document.FailureReason);
     }
+
+    public Task<FiscalDocumentDetails?>
+    FindByExternalDocumentIdAsync(
+        string tenantId,
+        string externalDocumentId,
+        CancellationToken cancellationToken = default)
+    {
+        var document = Documents.SingleOrDefault(
+            item =>
+                item.TenantId == tenantId
+                && item.ExternalDocumentId
+                    == externalDocumentId);
+
+        if (document is null)
+        {
+            return Task.FromResult<
+                FiscalDocumentDetails?>(null);
+        }
+
+        return Task.FromResult<
+            FiscalDocumentDetails?>(
+                MapToDetails(document));
+    }
 }

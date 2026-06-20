@@ -5,4 +5,5 @@ public sealed record CreateFiscalDocumentResult(
     string TenantId,
     string ExternalDocumentId,
     string Status,
-    DateTimeOffset ReceivedAtUtc);
+    DateTimeOffset ReceivedAtUtc,
+    bool WasCreated);
