@@ -6,6 +6,8 @@ namespace FiscalFlow.UnitTests.Fakes;
 internal sealed class FakeFiscalDocumentRepository
     : IFiscalDocumentRepository
 {
+    private readonly object _processingLock = new();
+
     public List<FiscalDocument> Documents { get; } = [];
 
     public Task InsertAsync(
@@ -52,6 +54,30 @@ internal sealed class FakeFiscalDocumentRepository
                 && item.TenantId == tenantId);
 
         return Task.FromResult(document);
+    }
+
+    public Task<FiscalDocument?> TryStartProcessingAsync(
+        Guid id,
+        string tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        lock (_processingLock)
+        {
+            var document = Documents.SingleOrDefault(
+                item => item.Id == id
+                    && item.TenantId == tenantId);
+
+            if (document is null
+                || document.Status is not
+                    DocumentProcessingStatus.Received
+                    and not DocumentProcessingStatus.Failed)
+            {
+                return Task.FromResult<FiscalDocument?>(null);
+            }
+
+            document.MarkAsProcessing();
+            return Task.FromResult<FiscalDocument?>(document);
+        }
     }
 
     public Task UpdateAsync(
