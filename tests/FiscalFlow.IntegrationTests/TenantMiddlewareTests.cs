@@ -1,5 +1,4 @@
 using System.Net;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace FiscalFlow.IntegrationTests;
@@ -13,10 +12,9 @@ public sealed class TenantMiddlewareTests
         WebApplicationFactory<Program> factory)
     {
         _client = factory
-            .WithWebHostBuilder(builder =>
-            {
-                builder.UseEnvironment("Testing");
-            })
+            .WithWebHostBuilder(
+                TenantRabbitMqConfiguration
+                    .UseTestingEnvironment)
             .CreateClient();
     }
 
