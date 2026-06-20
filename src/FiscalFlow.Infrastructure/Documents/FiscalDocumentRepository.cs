@@ -46,4 +46,32 @@ public sealed class FiscalDocumentRepository
             mongoModel,
             cancellationToken: cancellationToken);
     }
+
+    public async Task<FiscalDocumentDetails?> FindByIdAsync(
+    Guid id,
+    CancellationToken cancellationToken = default)
+    {
+        var idAsString = id.ToString();
+
+        var mongoModel = await _collection
+            .Find(document => document.Id == idAsString)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (mongoModel is null)
+        {
+            return null;
+        }
+
+        return new FiscalDocumentDetails(
+            Guid.Parse(mongoModel.Id),
+            mongoModel.TenantId,
+            mongoModel.ExternalDocumentId,
+            mongoModel.Status,
+            new DateTimeOffset(mongoModel.ReceivedAtUtc),
+            mongoModel.ProcessedAtUtc is null
+                ? null
+                : new DateTimeOffset(
+                    mongoModel.ProcessedAtUtc.Value),
+            mongoModel.FailureReason);
+    }
 }

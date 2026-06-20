@@ -9,12 +9,18 @@ namespace FiscalFlow.Api.Controllers;
 public sealed class FiscalDocumentsController
     : ControllerBase
 {
-    private readonly CreateFiscalDocumentService _service;
+    private readonly CreateFiscalDocumentService
+        _createService;
+
+    private readonly GetFiscalDocumentByIdService
+        _getByIdService;
 
     public FiscalDocumentsController(
-        CreateFiscalDocumentService service)
+        CreateFiscalDocumentService createService,
+        GetFiscalDocumentByIdService getByIdService)
     {
-        _service = service;
+        _createService = createService;
+        _getByIdService = getByIdService;
     }
 
     [HttpPost]
@@ -31,12 +37,35 @@ public sealed class FiscalDocumentsController
             request.TenantId,
             request.ExternalDocumentId);
 
-        var result = await _service.ExecuteAsync(
+        var result = await _createService.ExecuteAsync(
             command,
             cancellationToken);
 
-        return StatusCode(
-            StatusCodes.Status201Created,
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = result.Id },
             result);
+    }
+
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(
+        typeof(FiscalDocumentDetails),
+        StatusCodes.Status200OK)]
+    [ProducesResponseType(
+        StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetById(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var result = await _getByIdService.ExecuteAsync(
+            id,
+            cancellationToken);
+
+        if (result is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(result);
     }
 }

@@ -1,5 +1,6 @@
 using FiscalFlow.Application.Documents;
 using FiscalFlow.Domain.Documents;
+using FiscalFlow.UnitTests.Fakes;
 
 namespace FiscalFlow.UnitTests.Documents;
 
@@ -39,20 +40,5 @@ public sealed class CreateFiscalDocumentServiceTests
 
         Assert.Equal(savedDocument.Id, result.Id);
         Assert.Equal("Received", result.Status);
-    }
-
-    private sealed class FakeFiscalDocumentRepository
-        : IFiscalDocumentRepository
-    {
-        public List<FiscalDocument> Documents { get; } =
-            [];
-
-        public Task InsertAsync(
-            FiscalDocument document,
-            CancellationToken cancellationToken = default)
-        {
-            Documents.Add(document);
-            return Task.CompletedTask;
-        }
     }
 }
