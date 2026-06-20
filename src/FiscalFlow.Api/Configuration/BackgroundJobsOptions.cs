@@ -13,4 +13,11 @@ public sealed class BackgroundJobsOptions
         "hangfire";
 
     public int WorkerCount { get; init; } = 1;
+
+    public string FailedRetryCron { get; init; } =
+        "*/5 * * * *";
+
+    public int FailedBatchSize { get; init; } = 20;
+
+    public int MaximumFailedAttempts { get; init; } = 3;
 }
