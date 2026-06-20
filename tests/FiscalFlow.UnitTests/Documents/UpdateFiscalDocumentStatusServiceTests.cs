@@ -25,13 +25,19 @@ public sealed class UpdateFiscalDocumentStatusServiceTests
         var command =
             new UpdateFiscalDocumentStatusCommand(
                 document.Id,
+                "empresa-demo",
                 DocumentProcessingStatus.Processing,
                 null);
 
         var result = await service.ExecuteAsync(command);
 
         Assert.NotNull(result);
-        Assert.Equal("Processing", result.Status);
+        Assert.Equal(
+            "Processing",
+            result.Status);
+        Assert.Equal(
+            "empresa-demo",
+            result.TenantId);
     }
 
     [Fact]
@@ -55,14 +61,21 @@ public sealed class UpdateFiscalDocumentStatusServiceTests
         var command =
             new UpdateFiscalDocumentStatusCommand(
                 document.Id,
+                "empresa-demo",
                 DocumentProcessingStatus.Processed,
                 null);
 
         var result = await service.ExecuteAsync(command);
 
         Assert.NotNull(result);
-        Assert.Equal("Processed", result.Status);
-        Assert.NotNull(result.ProcessedAtUtc);
+        Assert.Equal(
+            "Processed",
+            result.Status);
+        Assert.NotNull(
+            result.ProcessedAtUtc);
+        Assert.Equal(
+            "empresa-demo",
+            result.TenantId);
     }
 
     [Fact]
@@ -78,6 +91,7 @@ public sealed class UpdateFiscalDocumentStatusServiceTests
         var command =
             new UpdateFiscalDocumentStatusCommand(
                 Guid.NewGuid(),
+                "empresa-demo",
                 DocumentProcessingStatus.Processing,
                 null);
 

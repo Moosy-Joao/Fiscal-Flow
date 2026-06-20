@@ -1,6 +1,7 @@
 using FiscalFlow.Application.Documents;
 using FiscalFlow.Infrastructure.Documents;
 using FiscalFlow.Infrastructure.MongoDb;
+using FiscalFlow.Api.Tenancy;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -43,6 +44,8 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     ListFiscalDocumentsService>();
 
+builder.Services.AddScoped<TenantContext>();
+
 var app = builder.Build();
 
 if (mongoDbOptions.InitializeIndexes)
@@ -58,6 +61,10 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+app.UseMiddleware<TenantMiddleware>();
+
+app.MapControllers();
 
 app.MapControllers();
 

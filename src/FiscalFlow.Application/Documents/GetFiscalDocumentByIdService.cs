@@ -12,6 +12,7 @@ public sealed class GetFiscalDocumentByIdService
 
     public Task<FiscalDocumentDetails?> ExecuteAsync(
         Guid id,
+        string tenantId,
         CancellationToken cancellationToken = default)
     {
         if (id == Guid.Empty)
@@ -21,8 +22,12 @@ public sealed class GetFiscalDocumentByIdService
                 nameof(id));
         }
 
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            tenantId);
+
         return _repository.FindByIdAsync(
             id,
+            tenantId.Trim(),
             cancellationToken);
     }
 }

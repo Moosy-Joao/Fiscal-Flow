@@ -23,8 +23,8 @@ public sealed class FiscalDocumentRepository
     }
 
     public async Task InsertAsync(
-    FiscalDocument document,
-    CancellationToken cancellationToken = default)
+        FiscalDocument document,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(document);
 
@@ -49,10 +49,12 @@ public sealed class FiscalDocumentRepository
 
     public async Task<FiscalDocumentDetails?> FindByIdAsync(
         Guid id,
+        string tenantId,
         CancellationToken cancellationToken = default)
     {
         var mongoModel = await FindMongoModelByIdAsync(
             id,
+            tenantId,
             cancellationToken);
 
         if (mongoModel is null)
@@ -65,10 +67,12 @@ public sealed class FiscalDocumentRepository
 
     public async Task<FiscalDocument?> FindDomainByIdAsync(
         Guid id,
+        string tenantId,
         CancellationToken cancellationToken = default)
     {
         var mongoModel = await FindMongoModelByIdAsync(
             id,
+            tenantId,
             cancellationToken);
 
         if (mongoModel is null)
@@ -90,7 +94,8 @@ public sealed class FiscalDocumentRepository
             mongoModel.TenantId,
             mongoModel.ExternalDocumentId,
             status,
-            ToDateTimeOffset(mongoModel.ReceivedAtUtc),
+            ToDateTimeOffset(
+                mongoModel.ReceivedAtUtc),
             mongoModel.ProcessedAtUtc is null
                 ? null
                 : ToDateTimeOffset(
@@ -108,7 +113,9 @@ public sealed class FiscalDocumentRepository
 
         var result = await _collection.ReplaceOneAsync(
             storedDocument =>
-                storedDocument.Id == mongoModel.Id,
+                storedDocument.Id == mongoModel.Id
+                && storedDocument.TenantId
+                    == mongoModel.TenantId,
             mongoModel,
             cancellationToken: cancellationToken);
 
@@ -120,9 +127,9 @@ public sealed class FiscalDocumentRepository
     }
 
     public async Task<PagedResult<FiscalDocumentDetails>>
-    ListAsync(
-        ListFiscalDocumentsQuery query,
-        CancellationToken cancellationToken = default)
+        ListAsync(
+            ListFiscalDocumentsQuery query,
+            CancellationToken cancellationToken = default)
     {
         var filterBuilder =
             Builders<FiscalDocumentMongoModel>.Filter;
@@ -130,9 +137,9 @@ public sealed class FiscalDocumentRepository
         var filters =
             new List<FilterDefinition<FiscalDocumentMongoModel>>
             {
-            filterBuilder.Eq(
-                document => document.TenantId,
-                query.TenantId)
+                filterBuilder.Eq(
+                    document => document.TenantId,
+                    query.TenantId)
             };
 
         if (query.Status is not null)
@@ -154,7 +161,9 @@ public sealed class FiscalDocumentRepository
             .Find(filter)
             .SortByDescending(
                 document => document.ReceivedAtUtc)
-            .Skip((query.Page - 1) * query.PageSize)
+            .Skip(
+                (query.Page - 1)
+                * query.PageSize)
             .Limit(query.PageSize)
             .ToListAsync(cancellationToken);
 
@@ -172,12 +181,15 @@ public sealed class FiscalDocumentRepository
     private async Task<FiscalDocumentMongoModel?>
         FindMongoModelByIdAsync(
             Guid id,
+            string tenantId,
             CancellationToken cancellationToken)
     {
         var idAsString = id.ToString();
 
         return await _collection
-            .Find(document => document.Id == idAsString)
+            .Find(document =>
+                document.Id == idAsString
+                && document.TenantId == tenantId)
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -195,7 +207,8 @@ public sealed class FiscalDocumentRepository
                 document.ReceivedAtUtc.UtcDateTime,
             ProcessedAtUtc =
                 document.ProcessedAtUtc?.UtcDateTime,
-            FailureReason = document.FailureReason
+            FailureReason =
+                document.FailureReason
         };
     }
 
@@ -207,7 +220,8 @@ public sealed class FiscalDocumentRepository
             mongoModel.TenantId,
             mongoModel.ExternalDocumentId,
             mongoModel.Status,
-            ToDateTimeOffset(mongoModel.ReceivedAtUtc),
+            ToDateTimeOffset(
+                mongoModel.ReceivedAtUtc),
             mongoModel.ProcessedAtUtc is null
                 ? null
                 : ToDateTimeOffset(

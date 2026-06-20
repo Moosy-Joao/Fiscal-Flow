@@ -1,4 +1,5 @@
 using FiscalFlow.Api.Contracts;
+using FiscalFlow.Api.Tenancy;
 using FiscalFlow.Application.Documents;
 using FiscalFlow.Domain.Documents;
 using Microsoft.AspNetCore.Mvc;
@@ -17,21 +18,26 @@ public sealed class FiscalDocumentsController
         _getByIdService;
 
     private readonly UpdateFiscalDocumentStatusService
-    _updateStatusService;
+        _updateStatusService;
 
     private readonly ListFiscalDocumentsService
-    _listService;
+        _listService;
+
+    private readonly TenantContext
+        _tenantContext;
 
     public FiscalDocumentsController(
-    CreateFiscalDocumentService createService,
-    GetFiscalDocumentByIdService getByIdService,
-    UpdateFiscalDocumentStatusService updateStatusService,
-    ListFiscalDocumentsService listService)
+        CreateFiscalDocumentService createService,
+        GetFiscalDocumentByIdService getByIdService,
+        UpdateFiscalDocumentStatusService updateStatusService,
+        ListFiscalDocumentsService listService,
+        TenantContext tenantContext)
     {
         _createService = createService;
         _getByIdService = getByIdService;
         _updateStatusService = updateStatusService;
         _listService = listService;
+        _tenantContext = tenantContext;
     }
 
     [HttpPost]
@@ -41,13 +47,13 @@ public sealed class FiscalDocumentsController
     [ProducesResponseType(
         StatusCodes.Status400BadRequest)]
     [ProducesResponseType(
-    StatusCodes.Status409Conflict)]
+        StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create(
-    CreateFiscalDocumentRequest request,
-    CancellationToken cancellationToken)
+        CreateFiscalDocumentRequest request,
+        CancellationToken cancellationToken)
     {
         var command = new CreateFiscalDocumentCommand(
-            request.TenantId,
+            _tenantContext.TenantId,
             request.ExternalDocumentId);
 
         try
@@ -68,31 +74,26 @@ public sealed class FiscalDocumentsController
             {
                 Title = "Documento fiscal duplicado",
                 Detail = exception.Message,
-                Status = StatusCodes.Status409Conflict
+                Status =
+                    StatusCodes.Status409Conflict
             });
         }
     }
 
-    [HttpGet("{id:guid}")]
-    [ProducesResponseType(
-        typeof(FiscalDocumentDetails),
-        StatusCodes.Status200OK)]
-    [ProducesResponseType(
-        StatusCodes.Status404NotFound)]
-
     [HttpGet]
     [ProducesResponseType(
-    typeof(PagedResult<FiscalDocumentDetails>),
-    StatusCodes.Status200OK)]
+        typeof(PagedResult<FiscalDocumentDetails>),
+        StatusCodes.Status200OK)]
     [ProducesResponseType(
-    StatusCodes.Status400BadRequest)]
+        StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> List(
-    [FromQuery] ListFiscalDocumentsRequest request,
-    CancellationToken cancellationToken)
+        [FromQuery] ListFiscalDocumentsRequest request,
+        CancellationToken cancellationToken)
     {
         DocumentProcessingStatus? status = null;
 
-        if (!string.IsNullOrWhiteSpace(request.Status))
+        if (!string.IsNullOrWhiteSpace(
+                request.Status))
         {
             if (!Enum.TryParse<DocumentProcessingStatus>(
                     request.Status,
@@ -113,7 +114,7 @@ public sealed class FiscalDocumentsController
         }
 
         var query = new ListFiscalDocumentsQuery(
-            request.TenantId,
+            _tenantContext.TenantId,
             status,
             request.Page,
             request.PageSize);
@@ -125,12 +126,19 @@ public sealed class FiscalDocumentsController
         return Ok(result);
     }
 
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(
+        typeof(FiscalDocumentDetails),
+        StatusCodes.Status200OK)]
+    [ProducesResponseType(
+        StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(
         Guid id,
         CancellationToken cancellationToken)
     {
         var result = await _getByIdService.ExecuteAsync(
             id,
+            _tenantContext.TenantId,
             cancellationToken);
 
         if (result is null)
@@ -143,23 +151,23 @@ public sealed class FiscalDocumentsController
 
     [HttpPatch("{id:guid}/status")]
     [ProducesResponseType(
-    typeof(FiscalDocumentDetails),
-    StatusCodes.Status200OK)]
+        typeof(FiscalDocumentDetails),
+        StatusCodes.Status200OK)]
     [ProducesResponseType(
-    StatusCodes.Status400BadRequest)]
+        StatusCodes.Status400BadRequest)]
     [ProducesResponseType(
-    StatusCodes.Status404NotFound)]
+        StatusCodes.Status404NotFound)]
     [ProducesResponseType(
-    StatusCodes.Status409Conflict)]
+        StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateStatus(
-    Guid id,
-    UpdateFiscalDocumentStatusRequest request,
-    CancellationToken cancellationToken)
+        Guid id,
+        UpdateFiscalDocumentStatusRequest request,
+        CancellationToken cancellationToken)
     {
         if (!Enum.TryParse<DocumentProcessingStatus>(
-            request.Status,
-            ignoreCase: true,
-            out var status)
+                request.Status,
+                ignoreCase: true,
+                out var status)
             || !Enum.IsDefined(
                 typeof(DocumentProcessingStatus),
                 status))
@@ -174,6 +182,7 @@ public sealed class FiscalDocumentsController
         var command =
             new UpdateFiscalDocumentStatusCommand(
                 id,
+                _tenantContext.TenantId,
                 status,
                 request.FailureReason);
 
@@ -203,9 +212,11 @@ public sealed class FiscalDocumentsController
         {
             return Conflict(new ProblemDetails
             {
-                Title = "Transição de status inválida",
+                Title =
+                    "Transição de status inválida",
                 Detail = exception.Message,
-                Status = StatusCodes.Status409Conflict
+                Status =
+                    StatusCodes.Status409Conflict
             });
         }
     }
