@@ -79,10 +79,11 @@ public sealed class ProcessFiscalDocumentService
                     "O documento fiscal não possui conteúdo XML.");
             }
 
-            _xmlParser.Parse(
+            var parsedData = _xmlParser.Parse(
                 document.XmlContent);
 
-            document.MarkAsProcessed();
+            document.CompleteProcessing(
+                FiscalDocumentDataMapper.Map(parsedData));
 
             await _repository.UpdateAsync(
                 document,
