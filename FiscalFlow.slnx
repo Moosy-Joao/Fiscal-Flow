@@ -1,11 +1,10 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/FiscalFlow.Api/FiscalFlow.Api.csproj" />
-    <Project Path="src/FiscalFlow.Application/FiscalFlow.Application.csproj" />
     <Project Path="src/FiscalFlow.Domain/FiscalFlow.Domain.csproj" />
-    <Project Path="src/FiscalFlow.Infrastructure/FiscalFlow.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/FiscalFlow.Tests/FiscalFlow.Tests.csproj" />
+    <Project Path="tests/FiscalFlow.UnitTests/FiscalFlow.UnitTests.csproj" />
+    <Project Path="tests/FiscalFlow.IntegrationTests/FiscalFlow.IntegrationTests.csproj" />
   </Folder>
 </Solution>

@@ -26,7 +26,11 @@ public sealed class FiscalDocumentService : IFiscalDocumentService
         _backgroundJobs = backgroundJobs;
     }
 
-    public async Task<SubmitFiscalDocumentResult> SubmitAsync(string tenantId, string idempotencyKey, SubmitFiscalDocumentRequest request, CancellationToken cancellationToken)
+    public async Task<SubmitFiscalDocumentResult> SubmitAsync(
+        string tenantId,
+        string idempotencyKey,
+        SubmitFiscalDocumentRequest request,
+        CancellationToken cancellationToken)
     {
         var existing = await _idempotency.GetAsync(tenantId, idempotencyKey, cancellationToken);
         if (existing is not null)
@@ -35,12 +39,9 @@ public sealed class FiscalDocumentService : IFiscalDocumentService
             return new SubmitFiscalDocumentResult(existing.DocumentId, true);
         }
 
-        var document = new FiscalDocument
+        var document = new FiscalDocument(tenantId, request.ExternalDocumentId)
         {
-            TenantId = tenantId,
-            ExternalDocumentId = request.ExternalDocumentId,
-            PayloadJson = request.Payload.GetRawText(),
-            Status = DocumentProcessingStatus.Received
+            PayloadJson = request.Payload.GetRawText()
         };
 
         await _documents.InsertAsync(document, cancellationToken);
@@ -57,9 +58,8 @@ public sealed class FiscalDocumentService : IFiscalDocumentService
         if (!insertSucceeded)
         {
             var winner = await _idempotency.GetAsync(tenantId, idempotencyKey, cancellationToken);
-            var winnerDocumentId = winner?.DocumentId ?? document.Id;
             DuplicateCounter.Add(1);
-            return new SubmitFiscalDocumentResult(winnerDocumentId, true);
+            return new SubmitFiscalDocumentResult(winner?.DocumentId ?? document.Id, true);
         }
 
         await _dispatchQueue.PublishAsync(tenantId, document.Id, cancellationToken);

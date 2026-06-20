@@ -1,28 +1,69 @@
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
-
 namespace FiscalFlow.Domain.Documents;
 
 public sealed class FiscalDocument
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; init; } = ObjectId.GenerateNewId().ToString();
+    public Guid Id { get; }
+    public string TenantId { get; }
+    public string ExternalDocumentId { get; }
+    public DocumentProcessingStatus Status { get; private set; }
+    public DateTimeOffset ReceivedAtUtc { get; }
+    public DateTimeOffset? ProcessedAtUtc { get; private set; }
+    public string? FailureReason { get; private set; }
 
-    [BsonRequired]
-    public string TenantId { get; init; } = string.Empty;
+    public FiscalDocument(
+        string tenantId,
+        string externalDocumentId,
+        DateTimeOffset? receivedAtUtc = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(externalDocumentId);
 
-    [BsonRequired]
-    public string ExternalDocumentId { get; init; } = string.Empty;
+        Id = Guid.NewGuid();
+        TenantId = tenantId.Trim();
+        ExternalDocumentId = externalDocumentId.Trim();
+        Status = DocumentProcessingStatus.Received;
+        ReceivedAtUtc = receivedAtUtc ?? DateTimeOffset.UtcNow;
+    }
 
-    [BsonRequired]
-    public string PayloadJson { get; init; } = string.Empty;
+    public void MarkAsProcessing()
+    {
+        if (Status is not DocumentProcessingStatus.Received
+            and not DocumentProcessingStatus.Failed)
+        {
+            throw new InvalidOperationException(
+                $"Não é possível iniciar o processamento de um documento com status {Status}.");
+        }
 
-    [BsonRequired]
-    public DocumentProcessingStatus Status { get; set; } = DocumentProcessingStatus.Received;
+        Status = DocumentProcessingStatus.Processing;
+        ProcessedAtUtc = null;
+        FailureReason = null;
+    }
 
-    [BsonRequired]
-    public DateTimeOffset ReceivedAtUtc { get; init; } = DateTimeOffset.UtcNow;
+    public void MarkAsProcessed(DateTimeOffset? processedAtUtc = null)
+    {
+        if (Status != DocumentProcessingStatus.Processing)
+        {
+            throw new InvalidOperationException(
+                "O documento precisa estar em processamento antes de ser concluído.");
+        }
 
-    public DateTimeOffset? ProcessedAtUtc { get; set; }
+        Status = DocumentProcessingStatus.Processed;
+        ProcessedAtUtc = processedAtUtc ?? DateTimeOffset.UtcNow;
+        FailureReason = null;
+    }
+
+    public void MarkAsFailed(string reason)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        if (Status == DocumentProcessingStatus.Processed)
+        {
+            throw new InvalidOperationException(
+                "Um documento processado não pode ser marcado como falha.");
+        }
+
+        Status = DocumentProcessingStatus.Failed;
+        ProcessedAtUtc = null;
+        FailureReason = reason.Trim();
+    }
 }
