@@ -8,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSingleton<TenantContext>();
+builder.Services.AddScoped<TenantContext>();
 builder.Services.AddHealthChecks();
 builder.Services.AddFiscalFlowInfrastructure(builder.Configuration);
 
