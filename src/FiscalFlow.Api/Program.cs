@@ -1,10 +1,12 @@
 using FiscalFlow.Api.Configuration;
+using FiscalFlow.Api.Jobs;
 using FiscalFlow.Api.Tenancy;
 using FiscalFlow.Application.Documents;
 using FiscalFlow.Application.Documents.Xml;
 using FiscalFlow.Infrastructure.Documents;
 using FiscalFlow.Infrastructure.MongoDb;
 using FiscalFlow.Infrastructure.RabbitMq;
+using Hangfire;
 using Microsoft.AspNetCore.Http.Features;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -68,14 +70,21 @@ builder.Services.AddSingleton<
 var rabbitMqEnabled =
     builder.AddRabbitMqFeature();
 
-builder.AddBackgroundJobsFeature(
-    mongoDbOptions);
+var backgroundJobsEnabled =
+    builder.AddBackgroundJobsFeature(
+        mongoDbOptions);
 
 builder.Services.AddScoped<
     CreateFiscalDocumentService>();
 
 builder.Services.AddScoped<
     ProcessFiscalDocumentService>();
+
+builder.Services.AddScoped<
+    RetryDocumentBatchService>();
+
+builder.Services.AddScoped<
+    RetryFailedDocumentsJob>();
 
 builder.Services.AddScoped<
     GetFiscalDocumentByIdService>();
@@ -106,6 +115,24 @@ if (rabbitMqEnabled)
             RabbitMqTopologyInitializer>();
 
     await topologyInitializer.InitializeAsync();
+}
+
+if (backgroundJobsEnabled)
+{
+    using var scope = app.Services.CreateScope();
+
+    var recurringJobs =
+        scope.ServiceProvider.GetRequiredService<
+            IRecurringJobManager>();
+
+    var options =
+        scope.ServiceProvider.GetRequiredService<
+            BackgroundJobsOptions>();
+
+    recurringJobs.AddOrUpdate<RetryFailedDocumentsJob>(
+        "retry-failed-documents",
+        job => job.ExecuteAsync(),
+        options.FailedRetryCron);
 }
 
 if (app.Environment.IsDevelopment())

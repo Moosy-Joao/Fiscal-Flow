@@ -80,6 +80,32 @@ internal sealed class FakeFiscalDocumentRepository
         }
     }
 
+    public Task<IReadOnlyCollection<FiscalDocument>>
+        ClaimFailedForReprocessingAsync(
+            int maximumAttempts,
+            int batchSize,
+            CancellationToken cancellationToken = default)
+    {
+        lock (_processingLock)
+        {
+            var documents = Documents
+                .Where(document =>
+                    document.Status == DocumentProcessingStatus.Failed
+                    && document.ReprocessingAttempts < maximumAttempts)
+                .OrderBy(document => document.ReceivedAtUtc)
+                .Take(batchSize)
+                .ToList();
+
+            foreach (var document in documents)
+            {
+                document.PrepareForReprocessing();
+            }
+
+            return Task.FromResult<
+                IReadOnlyCollection<FiscalDocument>>(documents);
+        }
+    }
+
     public Task UpdateAsync(
         FiscalDocument document,
         CancellationToken cancellationToken = default)

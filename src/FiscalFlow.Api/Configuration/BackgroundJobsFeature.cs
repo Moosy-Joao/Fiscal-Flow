@@ -25,7 +25,10 @@ internal static class BackgroundJobsFeature
 
         if (string.IsNullOrWhiteSpace(options.DatabaseName)
             || string.IsNullOrWhiteSpace(options.CollectionPrefix)
-            || options.WorkerCount <= 0)
+            || string.IsNullOrWhiteSpace(options.FailedRetryCron)
+            || options.WorkerCount <= 0
+            || options.FailedBatchSize <= 0
+            || options.MaximumFailedAttempts <= 0)
         {
             throw new InvalidOperationException(
                 "A seção BackgroundJobs não foi configurada corretamente.");

@@ -59,4 +59,11 @@ internal sealed class FiscalDocumentMongoModel
     [BsonElement("failureReason")]
     [BsonIgnoreIfNull]
     public string? FailureReason { get; init; }
+
+    [BsonElement("reprocessingAttempts")]
+    public int ReprocessingAttempts { get; init; }
+
+    [BsonElement("lastReprocessingAtUtc")]
+    [BsonIgnoreIfNull]
+    public DateTime? LastReprocessingAtUtc { get; init; }
 }
