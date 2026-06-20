@@ -3,11 +3,11 @@ using FiscalFlow.Domain.Documents;
 
 namespace FiscalFlow.IntegrationTests.Fakes;
 
-internal sealed class InMemoryFiscalDocumentRepository :
+public sealed class InMemoryFiscalDocumentRepository :
     IFiscalDocumentRepository
 {
     private readonly List<FiscalDocument> _documents = [];
-    private readonly Lock _lock = new();
+    private readonly object _lock = new();
 
     public IReadOnlyCollection<FiscalDocument> Documents
     {
