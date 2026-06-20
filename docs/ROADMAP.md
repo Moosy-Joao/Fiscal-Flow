@@ -60,16 +60,16 @@ branch → implementação → testes → Pull Request → merge → limpeza da 
 
 ## Fase 6 — RabbitMQ
 
-- [ ] adicionar RabbitMQ ao Docker Compose;
-- [ ] criar opções de configuração;
-- [ ] criar contrato de mensagem;
-- [ ] publicar mensagem após persistência;
-- [ ] criar consumidor assíncrono;
-- [ ] atualizar status automaticamente;
-- [ ] implementar retry;
-- [ ] implementar dead-letter queue;
+- [x] adicionar RabbitMQ ao Docker Compose;
+- [x] criar opções de configuração;
+- [x] criar contrato de mensagem;
+- [x] publicar mensagem após persistência;
+- [x] criar consumidor assíncrono;
+- [x] atualizar status automaticamente;
+- [x] implementar retry;
+- [x] implementar dead-letter queue;
 - [ ] testar duplicidade de mensagens;
-- [ ] testar indisponibilidade do broker.
+- [x] testar indisponibilidade do broker.
 
 ### Definição de concluído
 
@@ -89,14 +89,14 @@ branch → implementação → testes → Pull Request → merge → limpeza da 
 
 ## Fase 8 — XML fiscal
 
-- [ ] endpoint de upload;
-- [ ] limite de tamanho;
-- [ ] validação de XML;
-- [ ] leitura segura;
-- [ ] extração de dados fiscais;
-- [ ] armazenamento dos dados extraídos;
-- [ ] tratamento de XML inválido;
-- [ ] amostras de XML para testes;
+- [x] endpoint de upload;
+- [x] limite de tamanho;
+- [x] validação de XML;
+- [x] leitura segura;
+- [x] extração de dados fiscais;
+- [x] armazenamento dos dados extraídos;
+- [x] tratamento de XML inválido;
+- [x] amostras de XML para testes;
 - [ ] testes de segurança e integração.
 
 ## Fase 9 — Observabilidade
