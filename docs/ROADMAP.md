@@ -97,7 +97,7 @@ branch → implementação → testes → Pull Request → merge → limpeza da 
 - [x] armazenamento dos dados extraídos;
 - [x] tratamento de XML inválido;
 - [x] amostras de XML para testes;
-- [ ] testes de segurança e integração.
+- [x] testes de segurança e integração.
 
 ## Fase 9 — Observabilidade
 
