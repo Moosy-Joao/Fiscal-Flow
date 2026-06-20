@@ -32,6 +32,18 @@ public sealed class FiscalDocument
         private set;
     }
 
+    public int ReprocessingAttempts
+    {
+        get;
+        private set;
+    }
+
+    public DateTimeOffset? LastReprocessingAtUtc
+    {
+        get;
+        private set;
+    }
+
     public FiscalDocument(
         string tenantId,
         string externalDocumentId,
@@ -46,6 +58,8 @@ public sealed class FiscalDocument
             null,
             null,
             xmlContent,
+            null,
+            0,
             null)
     {
     }
@@ -59,7 +73,9 @@ public sealed class FiscalDocument
         DateTimeOffset? processedAtUtc,
         string? failureReason,
         string? xmlContent,
-        FiscalDocumentData? fiscalData)
+        FiscalDocumentData? fiscalData,
+        int reprocessingAttempts,
+        DateTimeOffset? lastReprocessingAtUtc)
     {
         if (id == Guid.Empty)
         {
@@ -91,6 +107,13 @@ public sealed class FiscalDocument
                 nameof(failureReason));
         }
 
+        if (reprocessingAttempts < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(reprocessingAttempts),
+                "A quantidade de tentativas de reprocessamento não pode ser negativa.");
+        }
+
         Id = id;
         TenantId = tenantId.Trim();
 
@@ -109,6 +132,9 @@ public sealed class FiscalDocument
 
         FailureReason =
             failureReason?.Trim();
+
+        ReprocessingAttempts = reprocessingAttempts;
+        LastReprocessingAtUtc = lastReprocessingAtUtc;
     }
 
     public static FiscalDocument Rehydrate(
@@ -120,7 +146,9 @@ public sealed class FiscalDocument
         DateTimeOffset? processedAtUtc,
         string? failureReason,
         string? xmlContent = null,
-        FiscalDocumentData? fiscalData = null)
+        FiscalDocumentData? fiscalData = null,
+        int reprocessingAttempts = 0,
+        DateTimeOffset? lastReprocessingAtUtc = null)
     {
         return new FiscalDocument(
             id,
@@ -131,7 +159,9 @@ public sealed class FiscalDocument
             processedAtUtc,
             failureReason,
             xmlContent,
-            fiscalData);
+            fiscalData,
+            reprocessingAttempts,
+            lastReprocessingAtUtc);
     }
 
     public void MarkAsProcessing()
@@ -148,6 +178,25 @@ public sealed class FiscalDocument
         Status =
             DocumentProcessingStatus.Processing;
 
+        ProcessedAtUtc = null;
+        FailureReason = null;
+        FiscalData = null;
+    }
+
+    public void PrepareForReprocessing(
+        DateTimeOffset? reprocessingAtUtc = null)
+    {
+        if (Status != DocumentProcessingStatus.Failed)
+        {
+            throw new InvalidOperationException(
+                "Somente documentos com falha podem ser preparados para reprocessamento.");
+        }
+
+        ReprocessingAttempts++;
+        LastReprocessingAtUtc =
+            reprocessingAtUtc ?? DateTimeOffset.UtcNow;
+
+        Status = DocumentProcessingStatus.Received;
         ProcessedAtUtc = null;
         FailureReason = null;
         FiscalData = null;
