@@ -5,11 +5,34 @@ using FiscalFlow.Application.Documents.Xml;
 using FiscalFlow.Infrastructure.Documents;
 using FiscalFlow.Infrastructure.MongoDb;
 using FiscalFlow.Infrastructure.RabbitMq;
+using Microsoft.AspNetCore.Http.Features;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+
+var uploadOptions = builder.Configuration
+    .GetSection(FiscalDocumentUploadOptions.SectionName)
+    .Get<FiscalDocumentUploadOptions>()
+    ?? new FiscalDocumentUploadOptions();
+
+if (uploadOptions.MaxFileSizeBytes <= 0)
+{
+    throw new InvalidOperationException(
+        "O limite de upload do XML deve ser maior que zero.");
+}
+
+var multipartBodyLengthLimit = checked(
+    uploadOptions.MaxFileSizeBytes + 64 * 1024);
+
+builder.Services.AddSingleton(uploadOptions);
+
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit =
+        multipartBodyLengthLimit;
+});
 
 var mongoDbOptions = builder.Configuration
     .GetSection(MongoDbOptions.SectionName)
@@ -38,6 +61,9 @@ builder.Services.AddSingleton<
 builder.Services.AddSingleton<
     IFiscalDocumentXmlParser,
     FiscalDocumentXmlParser>();
+
+builder.Services.AddSingleton<
+    FiscalDocumentXmlFileReader>();
 
 var rabbitMqEnabled =
     builder.AddRabbitMqFeature();
