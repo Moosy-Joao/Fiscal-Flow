@@ -69,5 +69,51 @@ internal sealed class FakeFiscalDocumentRepository
         Documents[index] = document;
 
         return Task.CompletedTask;
+         }
+
+        public Task<PagedResult<FiscalDocumentDetails>> ListAsync(
+    ListFiscalDocumentsQuery query,
+    CancellationToken cancellationToken = default)
+    {
+        IEnumerable<FiscalDocument> filteredDocuments =
+            Documents.Where(
+                document =>
+                    document.TenantId == query.TenantId);
+
+        if (query.Status is not null)
+        {
+            filteredDocuments =
+                filteredDocuments.Where(
+                    document =>
+                        document.Status == query.Status.Value);
+        }
+
+        var totalItems =
+            filteredDocuments.LongCount();
+
+        var items = filteredDocuments
+            .OrderByDescending(
+                document => document.ReceivedAtUtc)
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
+            .Select(document =>
+                new FiscalDocumentDetails(
+                    document.Id,
+                    document.TenantId,
+                    document.ExternalDocumentId,
+                    document.Status.ToString(),
+                    document.ReceivedAtUtc,
+                    document.ProcessedAtUtc,
+                    document.FailureReason))
+            .ToList();
+
+        var result =
+            new PagedResult<FiscalDocumentDetails>(
+                items,
+                query.Page,
+                query.PageSize,
+                totalItems);
+
+        return Task.FromResult(result);
     }
 }

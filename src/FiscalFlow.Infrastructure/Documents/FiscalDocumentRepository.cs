@@ -107,6 +107,56 @@ public sealed class FiscalDocumentRepository
         }
     }
 
+    public async Task<PagedResult<FiscalDocumentDetails>>
+    ListAsync(
+        ListFiscalDocumentsQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var filterBuilder =
+            Builders<FiscalDocumentMongoModel>.Filter;
+
+        var filters =
+            new List<FilterDefinition<FiscalDocumentMongoModel>>
+            {
+            filterBuilder.Eq(
+                document => document.TenantId,
+                query.TenantId)
+            };
+
+        if (query.Status is not null)
+        {
+            filters.Add(
+                filterBuilder.Eq(
+                    document => document.Status,
+                    query.Status.Value.ToString()));
+        }
+
+        var filter = filterBuilder.And(filters);
+
+        var totalItems =
+            await _collection.CountDocumentsAsync(
+                filter,
+                cancellationToken: cancellationToken);
+
+        var mongoModels = await _collection
+            .Find(filter)
+            .SortByDescending(
+                document => document.ReceivedAtUtc)
+            .Skip((query.Page - 1) * query.PageSize)
+            .Limit(query.PageSize)
+            .ToListAsync(cancellationToken);
+
+        var items = mongoModels
+            .Select(MapToDetails)
+            .ToList();
+
+        return new PagedResult<FiscalDocumentDetails>(
+            items,
+            query.Page,
+            query.PageSize,
+            totalItems);
+    }
+
     private async Task<FiscalDocumentMongoModel?>
         FindMongoModelByIdAsync(
             Guid id,

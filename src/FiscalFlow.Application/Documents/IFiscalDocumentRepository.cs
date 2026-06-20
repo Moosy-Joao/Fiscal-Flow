@@ -19,4 +19,8 @@ public interface IFiscalDocumentRepository
     Task UpdateAsync(
         FiscalDocument document,
         CancellationToken cancellationToken = default);
+
+    Task<PagedResult<FiscalDocumentDetails>> ListAsync(
+    ListFiscalDocumentsQuery query,
+    CancellationToken cancellationToken = default);
 }

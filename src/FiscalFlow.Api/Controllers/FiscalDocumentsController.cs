@@ -19,14 +19,19 @@ public sealed class FiscalDocumentsController
     private readonly UpdateFiscalDocumentStatusService
     _updateStatusService;
 
+    private readonly ListFiscalDocumentsService
+    _listService;
+
     public FiscalDocumentsController(
     CreateFiscalDocumentService createService,
     GetFiscalDocumentByIdService getByIdService,
-    UpdateFiscalDocumentStatusService updateStatusService)
+    UpdateFiscalDocumentStatusService updateStatusService,
+    ListFiscalDocumentsService listService)
     {
         _createService = createService;
         _getByIdService = getByIdService;
         _updateStatusService = updateStatusService;
+        _listService = listService;
     }
 
     [HttpPost]
@@ -59,6 +64,52 @@ public sealed class FiscalDocumentsController
         StatusCodes.Status200OK)]
     [ProducesResponseType(
         StatusCodes.Status404NotFound)]
+
+    [HttpGet]
+    [ProducesResponseType(
+    typeof(PagedResult<FiscalDocumentDetails>),
+    StatusCodes.Status200OK)]
+    [ProducesResponseType(
+    StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> List(
+    [FromQuery] ListFiscalDocumentsRequest request,
+    CancellationToken cancellationToken)
+    {
+        DocumentProcessingStatus? status = null;
+
+        if (!string.IsNullOrWhiteSpace(request.Status))
+        {
+            if (!Enum.TryParse<DocumentProcessingStatus>(
+                    request.Status,
+                    ignoreCase: true,
+                    out var parsedStatus)
+                || !Enum.IsDefined(
+                    typeof(DocumentProcessingStatus),
+                    parsedStatus))
+            {
+                ModelState.AddModelError(
+                    nameof(request.Status),
+                    "Status inválido.");
+
+                return ValidationProblem(ModelState);
+            }
+
+            status = parsedStatus;
+        }
+
+        var query = new ListFiscalDocumentsQuery(
+            request.TenantId,
+            status,
+            request.Page,
+            request.PageSize);
+
+        var result = await _listService.ExecuteAsync(
+            query,
+            cancellationToken);
+
+        return Ok(result);
+    }
+
     public async Task<IActionResult> GetById(
         Guid id,
         CancellationToken cancellationToken)
