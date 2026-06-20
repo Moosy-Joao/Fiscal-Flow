@@ -68,6 +68,9 @@ builder.Services.AddSingleton<
 var rabbitMqEnabled =
     builder.AddRabbitMqFeature();
 
+builder.AddBackgroundJobsFeature(
+    mongoDbOptions);
+
 builder.Services.AddScoped<
     CreateFiscalDocumentService>();
 
