@@ -70,6 +70,10 @@ builder.Services.AddSingleton<IProcessingTimeoutRepository>(
             FiscalDocumentRepository>());
 
 builder.Services.AddSingleton<
+    IDocumentCleanupRepository,
+    DocumentCleanupRepository>();
+
+builder.Services.AddSingleton<
     IFiscalDocumentXmlParser,
     FiscalDocumentXmlParser>();
 
@@ -100,6 +104,12 @@ builder.Services.AddScoped<
 
 builder.Services.AddScoped<
     DetectTimedOutProcessingJob>();
+
+builder.Services.AddScoped<
+    CleanupOldDocumentsService>();
+
+builder.Services.AddScoped<
+    CleanupOldDocumentsJob>();
 
 builder.Services.AddScoped<
     GetFiscalDocumentByIdService>();
@@ -153,6 +163,11 @@ if (backgroundJobsEnabled)
         "detect-timed-out-processing",
         job => job.ExecuteAsync(),
         options.TimedOutProcessingCron);
+
+    recurringJobs.AddOrUpdate<CleanupOldDocumentsJob>(
+        "cleanup-old-documents",
+        job => job.ExecuteAsync(),
+        options.CleanupCron);
 }
 
 if (app.Environment.IsDevelopment())
