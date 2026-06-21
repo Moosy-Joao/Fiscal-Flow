@@ -57,8 +57,17 @@ builder.Services.AddSingleton<
     FiscalDocumentIndexManager>();
 
 builder.Services.AddSingleton<
-    IFiscalDocumentRepository,
     FiscalDocumentRepository>();
+
+builder.Services.AddSingleton<IFiscalDocumentRepository>(
+    services =>
+        services.GetRequiredService<
+            FiscalDocumentRepository>());
+
+builder.Services.AddSingleton<IProcessingTimeoutRepository>(
+    services =>
+        services.GetRequiredService<
+            FiscalDocumentRepository>());
 
 builder.Services.AddSingleton<
     IFiscalDocumentXmlParser,
@@ -85,6 +94,12 @@ builder.Services.AddScoped<
 
 builder.Services.AddScoped<
     RetryFailedDocumentsJob>();
+
+builder.Services.AddScoped<
+    DetectTimedOutProcessingService>();
+
+builder.Services.AddScoped<
+    DetectTimedOutProcessingJob>();
 
 builder.Services.AddScoped<
     GetFiscalDocumentByIdService>();
@@ -133,6 +148,11 @@ if (backgroundJobsEnabled)
         "retry-failed-documents",
         job => job.ExecuteAsync(),
         options.FailedRetryCron);
+
+    recurringJobs.AddOrUpdate<DetectTimedOutProcessingJob>(
+        "detect-timed-out-processing",
+        job => job.ExecuteAsync(),
+        options.TimedOutProcessingCron);
 }
 
 if (app.Environment.IsDevelopment())
