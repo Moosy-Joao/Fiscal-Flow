@@ -27,4 +27,11 @@ public sealed class BackgroundJobsOptions
     public int TimedOutProcessingBatchSize { get; init; } = 20;
 
     public int ProcessingTimeoutMinutes { get; init; } = 15;
+
+    public string CleanupCron { get; init; } =
+        "0 3 * * *";
+
+    public int DocumentRetentionDays { get; init; } = 90;
+
+    public int CleanupBatchSize { get; init; } = 100;
 }
