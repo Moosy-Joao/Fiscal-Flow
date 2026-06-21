@@ -20,4 +20,11 @@ public sealed class BackgroundJobsOptions
     public int FailedBatchSize { get; init; } = 20;
 
     public int MaximumFailedAttempts { get; init; } = 3;
+
+    public string TimedOutProcessingCron { get; init; } =
+        "*/5 * * * *";
+
+    public int TimedOutProcessingBatchSize { get; init; } = 20;
+
+    public int ProcessingTimeoutMinutes { get; init; } = 15;
 }
