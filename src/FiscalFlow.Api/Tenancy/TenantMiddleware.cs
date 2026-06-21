@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FiscalFlow.Api.Tenancy;
@@ -33,6 +34,14 @@ public sealed class TenantMiddleware
         context.TraceIdentifier = correlationId;
         context.Response.Headers[CorrelationHeaderName] =
             correlationId;
+
+        Activity.Current?.SetTag(
+            "correlation.id",
+            correlationId);
+
+        Activity.Current?.AddBaggage(
+            "correlation.id",
+            correlationId);
 
         using var scope = _logger.BeginScope(
             new Dictionary<string, object>
@@ -78,6 +87,10 @@ public sealed class TenantMiddleware
         }
 
         tenantContext.SetTenantId(tenantId);
+
+        Activity.Current?.SetTag(
+            "tenant.id",
+            tenantContext.TenantId);
 
         using var tenantScope = _logger.BeginScope(
             new Dictionary<string, object>
