@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using FiscalFlow.Api.Configuration;
+using FiscalFlow.Api.Errors;
 using FiscalFlow.Api.Health;
 using FiscalFlow.Api.Jobs;
 using FiscalFlow.Api.Observability;
@@ -20,6 +21,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.AddObservabilityFeature();
 
 var uploadOptions = builder.Configuration
@@ -181,6 +184,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseExceptionHandler();
 app.UseMiddleware<TenantMiddleware>();
 
 app.MapControllers();
