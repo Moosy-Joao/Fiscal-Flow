@@ -52,6 +52,10 @@ internal sealed class FiscalDocumentMongoModel
     [BsonElement("receivedAtUtc")]
     public DateTime ReceivedAtUtc { get; init; }
 
+    [BsonElement("processingStartedAtUtc")]
+    [BsonIgnoreIfNull]
+    public DateTime? ProcessingStartedAtUtc { get; init; }
+
     [BsonElement("processedAtUtc")]
     [BsonIgnoreIfNull]
     public DateTime? ProcessedAtUtc { get; init; }
