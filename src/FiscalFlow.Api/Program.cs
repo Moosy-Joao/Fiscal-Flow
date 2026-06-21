@@ -1,5 +1,8 @@
+using System.Diagnostics;
 using FiscalFlow.Api.Configuration;
+using FiscalFlow.Api.Health;
 using FiscalFlow.Api.Jobs;
+using FiscalFlow.Api.Observability;
 using FiscalFlow.Api.Tenancy;
 using FiscalFlow.Application.Documents;
 using FiscalFlow.Application.Documents.Xml;
@@ -7,12 +10,17 @@ using FiscalFlow.Infrastructure.Documents;
 using FiscalFlow.Infrastructure.MongoDb;
 using FiscalFlow.Infrastructure.RabbitMq;
 using Hangfire;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Features;
+
+Activity.DefaultIdFormat = ActivityIdFormat.W3C;
+Activity.ForceDefaultIdFormat = true;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.AddObservabilityFeature();
 
 var uploadOptions = builder.Configuration
     .GetSection(FiscalDocumentUploadOptions.SectionName)
@@ -82,6 +90,19 @@ var rabbitMqEnabled =
 var backgroundJobsEnabled =
     builder.AddBackgroundJobsFeature(
         mongoDbOptions);
+
+var healthChecks = builder.Services
+    .AddHealthChecks()
+    .AddCheck<MongoDbHealthCheck>(
+        "mongodb",
+        tags: ["ready"]);
+
+if (rabbitMqEnabled)
+{
+    healthChecks.AddCheck<RabbitMqHealthCheck>(
+        "rabbitmq",
+        tags: ["ready"]);
+}
 
 builder.Services.AddScoped<
     CreateFiscalDocumentService>();
@@ -163,6 +184,23 @@ if (app.Environment.IsDevelopment())
 app.UseMiddleware<TenantMiddleware>();
 
 app.MapControllers();
+
+app.MapHealthChecks(
+    "/health/live",
+    new HealthCheckOptions
+    {
+        Predicate = _ => false,
+        ResponseWriter = HealthCheckResponseWriter.WriteAsync
+    });
+
+app.MapHealthChecks(
+    "/health/ready",
+    new HealthCheckOptions
+    {
+        Predicate = registration =>
+            registration.Tags.Contains("ready"),
+        ResponseWriter = HealthCheckResponseWriter.WriteAsync
+    });
 
 app.Run();
 
