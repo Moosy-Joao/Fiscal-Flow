@@ -27,11 +27,14 @@ internal static class BackgroundJobsFeature
             || string.IsNullOrWhiteSpace(options.CollectionPrefix)
             || string.IsNullOrWhiteSpace(options.FailedRetryCron)
             || string.IsNullOrWhiteSpace(options.TimedOutProcessingCron)
+            || string.IsNullOrWhiteSpace(options.CleanupCron)
             || options.WorkerCount <= 0
             || options.FailedBatchSize <= 0
             || options.MaximumFailedAttempts <= 0
             || options.TimedOutProcessingBatchSize <= 0
-            || options.ProcessingTimeoutMinutes <= 0)
+            || options.ProcessingTimeoutMinutes <= 0
+            || options.DocumentRetentionDays <= 0
+            || options.CleanupBatchSize <= 0)
         {
             throw new InvalidOperationException(
                 "A seção BackgroundJobs não foi configurada corretamente.");
