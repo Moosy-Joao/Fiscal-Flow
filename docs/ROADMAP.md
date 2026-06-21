@@ -101,14 +101,14 @@ branch → implementação → testes → Pull Request → merge → limpeza da 
 
 ## Fase 9 — Observabilidade
 
-- [ ] logs estruturados;
-- [ ] correlation ID;
-- [ ] propagação entre API e consumidor;
-- [ ] métricas de recebimento, sucesso e falha;
-- [ ] tempo de processamento;
-- [ ] tracing com OpenTelemetry;
-- [ ] health checks de MongoDB e RabbitMQ;
-- [ ] dashboards ou exportadores.
+- [x] logs estruturados;
+- [x] correlation ID;
+- [x] propagação entre API e consumidor;
+- [x] métricas de recebimento, sucesso e falha;
+- [x] tempo de processamento;
+- [x] tracing com OpenTelemetry;
+- [x] health checks de MongoDB e RabbitMQ;
+- [x] exportação OTLP para logs, métricas e traces.
 
 ## Fase 10 — Segurança
 

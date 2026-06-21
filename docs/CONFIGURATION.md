@@ -22,6 +22,15 @@ A configuração inclui host, porta, virtual host, nomes das filas, exchanges, r
 
 A seção `BackgroundJobs` controla ativação, banco, prefixo das coleções, workers, agendas, lotes, limite de tentativas e tempo máximo de processamento.
 
+## Observabilidade
+
+- `Observability__ServiceName`: nome do serviço exportado.
+- `Observability__ServiceVersion`: versão informada ao coletor.
+- `Observability__OtlpEnabled`: habilita exportação OTLP de logs, métricas e traces.
+- `Observability__OtlpEndpoint`: endereço absoluto do coletor OTLP.
+
+A exportação permanece desabilitada quando `OtlpEnabled` é falso. Health checks e logs JSON continuam ativos independentemente do coletor.
+
 ## Valores sensíveis
 
 Valores de autenticação não devem ser versionados. Em desenvolvimento, use user-secrets ou variáveis locais. Em hospedagem, utilize o mecanismo de configuração protegida oferecido pela plataforma.

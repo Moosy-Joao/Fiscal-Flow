@@ -1,10 +1,12 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using FiscalFlow.Application.Documents;
 using FiscalFlow.Application.Messaging;
+using FiscalFlow.Application.Observability;
 using FiscalFlow.Infrastructure.RabbitMq;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using FiscalFlow.Application.Documents;
 
 namespace FiscalFlow.Api.Messaging;
 
@@ -21,7 +23,7 @@ public sealed class FiscalDocumentReceivedConsumer :
     private readonly RabbitMqOptions _options;
 
     private readonly IServiceScopeFactory
-    _scopeFactory;
+        _scopeFactory;
 
     private readonly ILogger<
         FiscalDocumentReceivedConsumer> _logger;
@@ -29,19 +31,15 @@ public sealed class FiscalDocumentReceivedConsumer :
     private IChannel? _channel;
 
     public FiscalDocumentReceivedConsumer(
-    RabbitMqConnectionFactory connectionFactory,
-    RabbitMqOptions options,
-    IServiceScopeFactory scopeFactory,
-    ILogger<FiscalDocumentReceivedConsumer> logger)
+        RabbitMqConnectionFactory connectionFactory,
+        RabbitMqOptions options,
+        IServiceScopeFactory scopeFactory,
+        ILogger<FiscalDocumentReceivedConsumer> logger)
     {
         ArgumentNullException.ThrowIfNull(
             connectionFactory);
-
         ArgumentNullException.ThrowIfNull(options);
-
-        ArgumentNullException.ThrowIfNull(
-            scopeFactory);
-
+        ArgumentNullException.ThrowIfNull(scopeFactory);
         ArgumentNullException.ThrowIfNull(logger);
 
         _connectionFactory = connectionFactory;
@@ -104,6 +102,48 @@ public sealed class FiscalDocumentReceivedConsumer :
             (AsyncEventingBasicConsumer)sender;
 
         var channel = consumer.Channel;
+        var traceContext = RabbitMqTraceContext.Extract(
+            eventArgs.BasicProperties);
+
+        using var activity = traceContext.HasParent
+            ? FiscalFlowTelemetry.ActivitySource.StartActivity(
+                "rabbitmq consume fiscal-document.received",
+                ActivityKind.Consumer,
+                traceContext.ParentContext)
+            : FiscalFlowTelemetry.ActivitySource.StartActivity(
+                "rabbitmq consume fiscal-document.received",
+                ActivityKind.Consumer);
+
+        activity?.SetTag("messaging.system", "rabbitmq");
+        activity?.SetTag(
+            "messaging.destination.name",
+            _options.QueueName);
+        activity?.SetTag(
+            "messaging.operation.type",
+            "process");
+        activity?.SetTag(
+            "messaging.message.id",
+            eventArgs.BasicProperties.MessageId);
+
+        var correlationId =
+            traceContext.CorrelationId
+            ?? eventArgs.BasicProperties.MessageId
+            ?? Guid.NewGuid().ToString("N");
+
+        activity?.SetTag(
+            "correlation.id",
+            correlationId);
+
+        using var logScope = _logger.BeginScope(
+            new Dictionary<string, object>
+            {
+                ["CorrelationId"] = correlationId,
+                ["MessageId"] =
+                    eventArgs.BasicProperties.MessageId
+                    ?? string.Empty
+            });
+
+        var startedAt = Stopwatch.GetTimestamp();
 
         try
         {
@@ -119,21 +159,26 @@ public sealed class FiscalDocumentReceivedConsumer :
                     "A mensagem recebida está vazia.");
             }
 
+            activity?.SetTag(
+                "fiscal.document.id",
+                message.DocumentId);
+
+            using var documentScope = _logger.BeginScope(
+                new Dictionary<string, object>
+                {
+                    ["DocumentId"] = message.DocumentId,
+                    ["TenantId"] = message.TenantId,
+                    ["ExternalDocumentId"] =
+                        message.ExternalDocumentId
+                });
+
+            FiscalFlowTelemetry.DocumentsReceived.Add(1);
+
             _logger.LogInformation(
-                """
-                Documento fiscal recebido pelo consumidor.
-                DocumentId: {DocumentId}
-                TenantId: {TenantId}
-                ExternalDocumentId: {ExternalDocumentId}
-                CorrelationId: {CorrelationId}
-                """,
-                message.DocumentId,
-                message.TenantId,
-                message.ExternalDocumentId,
-                message.CorrelationId);
+                "Documento fiscal recebido pelo consumidor.");
 
             using var scope =
-    _scopeFactory.CreateScope();
+                _scopeFactory.CreateScope();
 
             var processingService =
                 scope.ServiceProvider
@@ -149,16 +194,11 @@ public sealed class FiscalDocumentReceivedConsumer :
                 command,
                 eventArgs.CancellationToken);
 
+            FiscalFlowTelemetry.DocumentsProcessed.Add(1);
+            activity?.SetStatus(ActivityStatusCode.Ok);
+
             _logger.LogInformation(
-                """
-    Documento fiscal processado com sucesso.
-    DocumentId: {DocumentId}
-    TenantId: {TenantId}
-    CorrelationId: {CorrelationId}
-    """,
-                message.DocumentId,
-                message.TenantId,
-                message.CorrelationId);
+                "Documento fiscal processado com sucesso.");
 
             await channel.BasicAckAsync(
                 deliveryTag: eventArgs.DeliveryTag,
@@ -170,14 +210,32 @@ public sealed class FiscalDocumentReceivedConsumer :
             when (eventArgs.CancellationToken
                 .IsCancellationRequested)
         {
-            // Encerramento normal da aplicação.
+            activity?.SetStatus(
+                ActivityStatusCode.Error,
+                "Processamento cancelado.");
         }
         catch (Exception exception)
         {
+            FiscalFlowTelemetry.DocumentsFailed.Add(1);
+
+            activity?.SetStatus(
+                ActivityStatusCode.Error,
+                exception.Message);
+
+            activity?.SetTag(
+                "error.type",
+                exception.GetType().FullName);
+
             await HandleProcessingFailureAsync(
                 channel,
                 eventArgs,
                 exception);
+        }
+        finally
+        {
+            FiscalFlowTelemetry.ProcessingDuration.Record(
+                Stopwatch.GetElapsedTime(startedAt)
+                    .TotalMilliseconds);
         }
     }
 
@@ -199,6 +257,8 @@ public sealed class FiscalDocumentReceivedConsumer :
                 exception,
                 retryCount);
 
+            FiscalFlowTelemetry.DocumentsDeadLettered.Add(1);
+
             await channel.BasicAckAsync(
                 deliveryTag: eventArgs.DeliveryTag,
                 multiple: false,
@@ -207,13 +267,7 @@ public sealed class FiscalDocumentReceivedConsumer :
 
             _logger.LogError(
                 exception,
-                """
-                Mensagem enviada para a Dead Letter Queue.
-                MessageId: {MessageId}
-                RetryCount: {RetryCount}
-                QueueName: {QueueName}
-                """,
-                eventArgs.BasicProperties.MessageId,
+                "Mensagem enviada para a Dead Letter Queue. RetryCount: {RetryCount}. QueueName: {QueueName}.",
                 retryCount,
                 _options.DeadLetterQueueName);
 
@@ -225,14 +279,7 @@ public sealed class FiscalDocumentReceivedConsumer :
 
         _logger.LogWarning(
             exception,
-            """
-            Falha ao processar mensagem RabbitMQ.
-            A mensagem será enviada para retry.
-            MessageId: {MessageId}
-            RetryAttempt: {RetryAttempt}
-            MaxRetryAttempts: {MaxRetryAttempts}
-            """,
-            eventArgs.BasicProperties.MessageId,
+            "Falha ao processar mensagem. RetryAttempt: {RetryAttempt}. MaxRetryAttempts: {MaxRetryAttempts}.",
             nextRetryAttempt,
             _options.MaxRetryAttempts);
 
@@ -350,20 +397,16 @@ public sealed class FiscalDocumentReceivedConsumer :
         return value switch
         {
             string text => text,
-
             byte[] bytes =>
                 Encoding.UTF8.GetString(bytes),
-
             ReadOnlyMemory<byte> memory =>
                 Encoding.UTF8.GetString(
                     memory.Span),
-
             ArraySegment<byte> segment =>
                 Encoding.UTF8.GetString(
                     segment.Array!,
                     segment.Offset,
                     segment.Count),
-
             _ => null
         };
     }
@@ -380,11 +423,9 @@ public sealed class FiscalDocumentReceivedConsumer :
             int number => number,
             uint number => number,
             long number => number,
-
             ulong number
                 when number <= long.MaxValue =>
                     (long)number,
-
             _ => 0
         };
     }

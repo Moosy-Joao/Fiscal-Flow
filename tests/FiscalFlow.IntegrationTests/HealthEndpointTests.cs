@@ -37,6 +37,25 @@ public sealed class HealthEndpointTests
         Assert.Equal("Healthy", body.Status);
     }
 
+    [Fact]
+    public async Task GetLiveness_ShouldReturnHealthyResponse()
+    {
+        var response = await _client.GetAsync(
+            "/health/live");
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            response.StatusCode);
+
+        var content = await response.Content
+            .ReadAsStringAsync();
+
+        Assert.Contains(
+            "Healthy",
+            content,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed record HealthResponse(
         string Application,
         string Status,
