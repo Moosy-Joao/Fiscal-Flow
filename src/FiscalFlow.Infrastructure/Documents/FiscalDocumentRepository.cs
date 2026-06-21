@@ -6,9 +6,12 @@ using MongoDB.Driver;
 namespace FiscalFlow.Infrastructure.Documents;
 
 public sealed class FiscalDocumentRepository
-    : IFiscalDocumentRepository
+    : IFiscalDocumentRepository,
+      IProcessingTimeoutRepository
 {
     private const string CollectionName = "fiscalDocuments";
+    private const string ProcessingTimeoutFailureReason =
+        "Tempo limite de processamento excedido.";
 
     private readonly IMongoCollection<FiscalDocumentMongoModel>
         _collection;
@@ -108,6 +111,9 @@ public sealed class FiscalDocumentRepository
             updateBuilder.Set(
                 document => document.Status,
                 DocumentProcessingStatus.Processing.ToString()),
+            updateBuilder.Set(
+                document => document.ProcessingStartedAtUtc,
+                DateTime.UtcNow),
             updateBuilder.Unset(document => document.ProcessedAtUtc),
             updateBuilder.Unset(document => document.FailureReason),
             updateBuilder.Unset(document => document.AccessKey),
@@ -180,6 +186,7 @@ public sealed class FiscalDocumentRepository
             updateBuilder.Set(
                 document => document.LastReprocessingAtUtc,
                 DateTime.UtcNow),
+            updateBuilder.Unset(document => document.ProcessingStartedAtUtc),
             updateBuilder.Unset(document => document.ProcessedAtUtc),
             updateBuilder.Unset(document => document.FailureReason),
             updateBuilder.Unset(document => document.AccessKey),
@@ -216,6 +223,91 @@ public sealed class FiscalDocumentRepository
         }
 
         return claimedDocuments;
+    }
+
+    public async Task<int> MarkTimedOutProcessingAsFailedAsync(
+        DateTimeOffset startedBeforeUtc,
+        int batchSize,
+        CancellationToken cancellationToken = default)
+    {
+        if (batchSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(batchSize),
+                "O tamanho do lote deve ser maior que zero.");
+        }
+
+        var cutoff = startedBeforeUtc.UtcDateTime;
+        var filterBuilder = Builders<FiscalDocumentMongoModel>.Filter;
+
+        var hasTimedOutStart = filterBuilder.And(
+            filterBuilder.Exists(
+                document => document.ProcessingStartedAtUtc,
+                true),
+            filterBuilder.Lte(
+                document => document.ProcessingStartedAtUtc,
+                cutoff));
+
+        var legacyTimedOut = filterBuilder.And(
+            filterBuilder.Exists(
+                document => document.ProcessingStartedAtUtc,
+                false),
+            filterBuilder.Lte(
+                document => document.ReceivedAtUtc,
+                cutoff));
+
+        var filter = filterBuilder.And(
+            filterBuilder.Eq(
+                document => document.Status,
+                DocumentProcessingStatus.Processing.ToString()),
+            filterBuilder.Or(hasTimedOutStart, legacyTimedOut));
+
+        var updateBuilder = Builders<FiscalDocumentMongoModel>.Update;
+        var update = updateBuilder.Combine(
+            updateBuilder.Set(
+                document => document.Status,
+                DocumentProcessingStatus.Failed.ToString()),
+            updateBuilder.Set(
+                document => document.FailureReason,
+                ProcessingTimeoutFailureReason),
+            updateBuilder.Unset(document => document.ProcessingStartedAtUtc),
+            updateBuilder.Unset(document => document.ProcessedAtUtc),
+            updateBuilder.Unset(document => document.AccessKey),
+            updateBuilder.Unset(document => document.IssuerDocument),
+            updateBuilder.Unset(document => document.IssuerName),
+            updateBuilder.Unset(document => document.RecipientDocument),
+            updateBuilder.Unset(document => document.RecipientName),
+            updateBuilder.Unset(document => document.TotalValue),
+            updateBuilder.Unset(document => document.IssuedAt));
+
+        var options = new FindOneAndUpdateOptions<
+            FiscalDocumentMongoModel,
+            FiscalDocumentMongoModel>
+        {
+            ReturnDocument = ReturnDocument.After,
+            Sort = Builders<FiscalDocumentMongoModel>.Sort
+                .Ascending(document => document.ReceivedAtUtc)
+        };
+
+        var recoveredCount = 0;
+
+        for (var index = 0; index < batchSize; index++)
+        {
+            var model = await _collection.FindOneAndUpdateAsync(
+                filter,
+                update,
+                options,
+                cancellationToken);
+
+            if (model is null)
+            {
+                break;
+            }
+
+            recoveredCount++;
+        }
+
+        return recoveredCount;
     }
 
     public async Task UpdateAsync(

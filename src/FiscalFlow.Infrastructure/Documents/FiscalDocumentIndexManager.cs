@@ -66,11 +66,28 @@ public sealed class FiscalDocumentIndexManager
                         "ix_fiscal_documents_tenant_status_received_at"
                 });
 
+        var processingTimeoutIndex =
+            new CreateIndexModel<FiscalDocumentMongoModel>(
+                indexKeys
+                    .Ascending(document => document.Status)
+                    .Ascending(
+                        document =>
+                            document.ProcessingStartedAtUtc)
+                    .Ascending(
+                        document =>
+                            document.ReceivedAtUtc),
+                new CreateIndexOptions
+                {
+                    Name =
+                        "ix_fiscal_documents_status_processing_started_at"
+                });
+
         var indexes = new[]
         {
             uniqueDocumentIndex,
             tenantAndDateIndex,
-            tenantStatusAndDateIndex
+            tenantStatusAndDateIndex,
+            processingTimeoutIndex
         };
 
         await _collection.Indexes.CreateManyAsync(

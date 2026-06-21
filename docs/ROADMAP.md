@@ -81,8 +81,8 @@ branch → implementação → testes → Pull Request → merge → limpeza da 
 ## Fase 7 — Hangfire
 
 - [x] configurar storage;
-- [ ] agendar reprocessamento de falhas;
-- [ ] detectar documentos presos em `Processing`;
+- [x] agendar reprocessamento de falhas;
+- [x] detectar documentos presos em `Processing`;
 - [ ] criar rotina de limpeza;
 - [ ] proteger dashboard;
 - [ ] adicionar testes das rotinas.
