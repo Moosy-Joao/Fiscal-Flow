@@ -25,6 +25,8 @@ internal static class ObservabilityFeature
 
         builder.Services.AddSingleton(options);
 
+        builder.Logging.ClearProviders();
+
         builder.Logging.Configure(logging =>
         {
             logging.ActivityTrackingOptions =
