@@ -7,6 +7,7 @@ public sealed class TenantMiddleware
 {
     public const string HeaderName = "X-Tenant-Id";
     public const string CorrelationHeaderName = "X-Correlation-ID";
+    public const string TenantClaimType = "tenant_id";
 
     private readonly RequestDelegate _next;
     private readonly ILogger<TenantMiddleware> _logger;
@@ -59,29 +60,13 @@ public sealed class TenantMiddleware
             return;
         }
 
-        var tenantId =
-            context.Request.Headers[HeaderName]
-                .ToString();
+        var tenantId = ResolveTenantId(context);
 
         if (string.IsNullOrWhiteSpace(tenantId))
         {
-            context.Response.StatusCode =
-                StatusCodes.Status400BadRequest;
-
-            await context.Response.WriteAsJsonAsync(
-                new ProblemDetails
-                {
-                    Title = "Tenant não informado",
-                    Detail =
-                        $"Informe o cabeçalho '{HeaderName}'.",
-                    Status =
-                        StatusCodes.Status400BadRequest,
-                    Extensions =
-                    {
-                        ["correlationId"] = correlationId
-                    }
-                },
-                context.RequestAborted);
+            await WriteTenantProblemAsync(
+                context,
+                correlationId);
 
             return;
         }
@@ -99,6 +84,48 @@ public sealed class TenantMiddleware
             });
 
         await _next(context);
+    }
+
+    private static string? ResolveTenantId(HttpContext context)
+    {
+        if (context.User.Identity?.IsAuthenticated == true)
+        {
+            return context.User.FindFirst(TenantClaimType)?.Value;
+        }
+
+        return context.Request.Headers[HeaderName]
+            .FirstOrDefault();
+    }
+
+    private static Task WriteTenantProblemAsync(
+        HttpContext context,
+        string correlationId)
+    {
+        var authenticated =
+            context.User.Identity?.IsAuthenticated == true;
+
+        var statusCode = authenticated
+            ? StatusCodes.Status403Forbidden
+            : StatusCodes.Status400BadRequest;
+
+        context.Response.StatusCode = statusCode;
+
+        return context.Response.WriteAsJsonAsync(
+            new ProblemDetails
+            {
+                Title = authenticated
+                    ? "Tenant ausente na identidade"
+                    : "Tenant não informado",
+                Detail = authenticated
+                    ? $"O token autenticado deve possuir a claim '{TenantClaimType}'."
+                    : $"Informe o cabeçalho '{HeaderName}'.",
+                Status = statusCode,
+                Extensions =
+                {
+                    ["correlationId"] = correlationId
+                }
+            },
+            context.RequestAborted);
     }
 
     private static string ResolveCorrelationId(
