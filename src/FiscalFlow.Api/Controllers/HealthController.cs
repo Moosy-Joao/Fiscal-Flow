@@ -1,8 +1,12 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace FiscalFlow.Api.Controllers;
 
 [ApiController]
+[AllowAnonymous]
+[DisableRateLimiting]
 [Route("api/health")]
 public sealed class HealthController : ControllerBase
 {

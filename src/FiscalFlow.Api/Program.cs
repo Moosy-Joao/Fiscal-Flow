@@ -4,6 +4,7 @@ using FiscalFlow.Api.Errors;
 using FiscalFlow.Api.Health;
 using FiscalFlow.Api.Jobs;
 using FiscalFlow.Api.Observability;
+using FiscalFlow.Api.Security;
 using FiscalFlow.Api.Tenancy;
 using FiscalFlow.Application.Documents;
 using FiscalFlow.Application.Documents.Xml;
@@ -11,6 +12,7 @@ using FiscalFlow.Infrastructure.Documents;
 using FiscalFlow.Infrastructure.MongoDb;
 using FiscalFlow.Infrastructure.RabbitMq;
 using Hangfire;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Features;
 
@@ -24,6 +26,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.AddObservabilityFeature();
+
+var securityOptions = builder.AddSecurityFeature();
 
 var uploadOptions = builder.Configuration
     .GetSection(FiscalDocumentUploadOptions.SectionName)
@@ -185,26 +189,41 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
+app.UseAuthentication();
+app.UseRateLimiter();
+app.UseAuthorization();
 app.UseMiddleware<TenantMiddleware>();
 
-app.MapControllers();
+var controllers = app.MapControllers()
+    .RequireRateLimiting(
+        SecurityFeature.RateLimitPolicyName);
+
+if (securityOptions.Enabled)
+{
+    controllers.RequireAuthorization(
+        SecurityFeature.AuthorizationPolicyName);
+}
 
 app.MapHealthChecks(
-    "/health/live",
-    new HealthCheckOptions
-    {
-        Predicate = _ => false,
-        ResponseWriter = HealthCheckResponseWriter.WriteAsync
-    });
+        "/health/live",
+        new HealthCheckOptions
+        {
+            Predicate = _ => false,
+            ResponseWriter =
+                HealthCheckResponseWriter.WriteAsync
+        })
+    .AllowAnonymous();
 
 app.MapHealthChecks(
-    "/health/ready",
-    new HealthCheckOptions
-    {
-        Predicate = registration =>
-            registration.Tags.Contains("ready"),
-        ResponseWriter = HealthCheckResponseWriter.WriteAsync
-    });
+        "/health/ready",
+        new HealthCheckOptions
+        {
+            Predicate = registration =>
+                registration.Tags.Contains("ready"),
+            ResponseWriter =
+                HealthCheckResponseWriter.WriteAsync
+        })
+    .AllowAnonymous();
 
 app.Run();
 
