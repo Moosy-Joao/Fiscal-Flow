@@ -16,7 +16,7 @@ O ASP.NET Core converte `:` em `__` nos nomes das variáveis de ambiente. Por ex
 
 ## RabbitMQ
 
-A configuração inclui host, porta, virtual host, nomes das filas, exchanges, routing keys, intervalo de repetição e máximo de tentativas. Os nomes correspondem à seção `RabbitMq` de `appsettings.Development.json`.
+A seção `RabbitMq` controla host, porta, virtual host, filas, exchanges, routing keys, intervalo de repetição e máximo de tentativas.
 
 ## Hangfire
 
@@ -29,8 +29,18 @@ A seção `BackgroundJobs` controla ativação, banco, prefixo das coleções, w
 - `Observability__OtlpEnabled`: habilita exportação OTLP de logs, métricas e traces.
 - `Observability__OtlpEndpoint`: endereço absoluto do coletor OTLP.
 
-A exportação permanece desabilitada quando `OtlpEnabled` é falso. Health checks e logs JSON continuam ativos independentemente do coletor.
+A exportação permanece desabilitada quando `OtlpEnabled` é falso. Health checks e logs estruturados continuam ativos independentemente do coletor.
 
-## Valores sensíveis
+## Segurança
 
-Valores de autenticação não devem ser versionados. Em desenvolvimento, use user-secrets ou variáveis locais. Em hospedagem, utilize o mecanismo de configuração protegida oferecido pela plataforma.
+A configuração de segurança será adicionada na próxima etapa do projeto. Ela abrangerá autenticação JWT Bearer, validação de issuer e audience, autorização, claim de tenant e rate limiting.
+
+Nenhum segredo deverá ser versionado em `appsettings.json`. Em desenvolvimento, use user-secrets ou variáveis locais. Em hospedagem, utilize o mecanismo de configuração protegida oferecido pela plataforma.
+
+## Fluxo de branches
+
+- `dev`: implementação;
+- `tests`: validação e CI;
+- `main`: versão aprovada.
+
+Toda alteração deve passar por `tests` antes de chegar à `main`.

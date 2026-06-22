@@ -1,12 +1,18 @@
 # Roadmap do FiscalFlow
 
-## Princípio de evolução
+## Fluxo de evolução
 
-O projeto é desenvolvido em incrementos pequenos. Cada funcionalidade passa por:
+O projeto utiliza somente três branches permanentes:
 
 ```text
-branch → implementação → testes → Pull Request → merge → limpeza da branch
+dev → tests → main
 ```
+
+- `dev`: implementação e correções;
+- `tests`: validação integrada e execução do CI;
+- `main`: versão aprovada e estável.
+
+Uma alteração só chega à `main` depois de compilar e passar por todos os testes na `tests`. Quando houver falha, a correção volta para a `dev`, é sincronizada novamente com a `tests` e validada outra vez.
 
 ## Fase 1 — Fundação
 
@@ -15,7 +21,7 @@ branch → implementação → testes → Pull Request → merge → limpeza da 
 - [x] testes unitários;
 - [x] testes de integração;
 - [x] GitHub Actions para restore, build, testes e cobertura;
-- [x] Docker Compose de desenvolvimento.
+- [x] ambiente local com Docker Compose.
 
 ## Fase 2 — MongoDB
 
@@ -39,14 +45,13 @@ branch → implementação → testes → Pull Request → merge → limpeza da 
 
 ## Fase 4 — Multi-tenancy
 
-- [x] cabeçalho `X-Tenant-Id`;
+- [x] cabeçalho `X-Tenant-Id` para modo sem autenticação;
 - [x] middleware de tenant;
 - [x] contexto por requisição;
-- [x] isolamento na criação;
-- [x] isolamento na consulta;
-- [x] isolamento na listagem;
-- [x] isolamento na atualização;
-- [x] testes de acesso cruzado.
+- [x] isolamento na criação, consulta, listagem e atualização;
+- [x] suporte à claim `tenant_id` em identidades autenticadas;
+- [x] validação do identificador do tenant;
+- [x] testes de acesso cruzado e precedência da claim.
 
 ## Fase 5 — Idempotência
 
@@ -60,7 +65,7 @@ branch → implementação → testes → Pull Request → merge → limpeza da 
 
 ## Fase 6 — RabbitMQ
 
-- [x] adicionar RabbitMQ ao Docker Compose;
+- [x] adicionar RabbitMQ ao ambiente local;
 - [x] criar opções de configuração;
 - [x] criar contrato de mensagem;
 - [x] publicar mensagem após persistência;
@@ -80,12 +85,12 @@ branch → implementação → testes → Pull Request → merge → limpeza da 
 
 ## Fase 7 — Hangfire
 
-- [x] configurar storage;
+- [x] configurar storage MongoDB;
 - [x] agendar reprocessamento de falhas;
 - [x] detectar documentos presos em `Processing`;
 - [ ] criar rotina de limpeza;
 - [ ] proteger dashboard;
-- [ ] adicionar testes das rotinas.
+- [ ] ampliar testes das rotinas recorrentes.
 
 ## Fase 8 — XML fiscal
 
@@ -108,40 +113,60 @@ branch → implementação → testes → Pull Request → merge → limpeza da 
 - [x] tempo de processamento;
 - [x] tracing com OpenTelemetry;
 - [x] health checks de MongoDB e RabbitMQ;
-- [x] exportação OTLP para logs, métricas e traces.
+- [x] exportação OTLP opcional.
 
 ## Fase 10 — Segurança
 
-- [ ] autenticação JWT;
-- [ ] tenant obtido pelas claims;
-- [ ] autorização;
-- [ ] rate limiting;
-- [ ] configuração de segredos;
-- [ ] padronização global de erros;
-- [ ] validações adicionais de entrada;
-- [ ] revisão de segurança.
+### Já disponível
+
+- [x] tenant obtido pela claim quando a identidade já está autenticada;
+- [x] rejeição de identidade autenticada sem tenant;
+- [x] padronização global de erros com `ProblemDetails`;
+- [x] validações adicionais de entrada;
+- [x] correlation ID nas respostas de erro.
+
+### Próxima implementação
+
+- [ ] autenticação JWT Bearer;
+- [ ] validação de issuer, audience, assinatura e expiração;
+- [ ] autorização por política;
+- [ ] proteção dos endpoints fiscais;
+- [ ] endpoints de saúde anônimos;
+- [ ] rate limiting por usuário ou endereço IP;
+- [ ] configuração de segredos por ambiente;
+- [ ] documentação de autenticação;
+- [ ] testes de autenticação, autorização e limite de requisições;
+- [ ] revisão final de segurança.
 
 ## Fase 11 — Entrega final
 
-- [ ] Dockerfile da API;
-- [ ] Dockerfile do consumidor;
-- [ ] Docker Compose completo;
-- [ ] variáveis de ambiente documentadas;
-- [ ] coleção de requisições;
-- [ ] diagrama final;
+- [x] Dockerfile da API;
+- [x] consumidor hospedado junto à aplicação;
+- [ ] Docker Compose completo com API, MongoDB e RabbitMQ;
+- [x] variáveis de ambiente documentadas;
+- [x] catálogo de endpoints;
+- [ ] diagrama final de implantação;
 - [ ] testes ponta a ponta;
 - [ ] deploy;
-- [ ] revisão do README;
+- [x] revisão geral do README;
 - [ ] demonstração para portfólio.
+
+## Ordem atual de trabalho
+
+1. concluir segurança;
+2. finalizar Hangfire;
+3. completar Docker Compose;
+4. criar testes ponta a ponta;
+5. revisar documentação técnica final;
+6. realizar deploy quando plataforma e credenciais estiverem disponíveis.
 
 ## Critérios gerais de qualidade
 
-Uma fase só deve ser considerada concluída quando:
+Uma etapa só é considerada concluída quando:
 
 - o código compila sem erros;
-- os testes passam;
-- o comportamento foi validado manualmente quando necessário;
+- os testes passam na branch `tests`;
+- o comportamento foi validado quando necessário;
 - a documentação foi atualizada;
-- o Pull Request foi revisado e mesclado;
-- a branch foi excluída local e remotamente;
-- a `main` ficou sincronizada e limpa.
+- a alteração foi promovida para `main`;
+- `dev`, `tests` e `main` ficaram sincronizadas após a entrega.
