@@ -6,13 +6,13 @@
 
 API SaaS multi-tenant para recebimento, consulta e processamento assíncrono de documentos fiscais eletrônicos.
 
-O FiscalFlow é um projeto de estudo e portfólio voltado a práticas de backend corporativo com C# e .NET. A solução aplica arquitetura em camadas, persistência NoSQL, isolamento por tenant, idempotência, mensageria, jobs recorrentes, processamento seguro de XML, observabilidade e integração contínua.
+O FiscalFlow é um projeto de estudo e portfólio voltado a práticas de backend corporativo com C# e .NET. A solução aplica arquitetura em camadas, persistência NoSQL, isolamento por tenant, idempotência, mensageria, jobs recorrentes, processamento seguro de XML, observabilidade, segurança opcional e integração contínua.
 
-> **Status:** em desenvolvimento. A base funcional, o processamento assíncrono e a observabilidade estão implementados. A prioridade atual é concluir autenticação, autorização e demais controles de segurança.
+> **Status:** em desenvolvimento. A base funcional, o processamento assíncrono, a observabilidade e a camada de segurança (JWT e rate limiting) estão implementados. A prioridade atual é finalizar proteção do dashboard Hangfire, ampliar testes ponta a ponta e preparar deploy.
 
 ## Funcionalidades implementadas
 
-- criação idempotente de documentos fiscais;
+- criação idempotente de documentos fiscais (JSON ou upload de XML);
 - consulta, listagem paginada e atualização de status;
 - isolamento lógico por tenant;
 - suporte ao tenant pela claim `tenant_id` em identidades autenticadas;
@@ -29,9 +29,10 @@ O FiscalFlow é um projeto de estudo e portfólio voltado a práticas de backend
 - propagação de correlation ID entre API e consumidor;
 - health checks de MongoDB e RabbitMQ;
 - respostas de erro padronizadas com `ProblemDetails`;
+- autenticação JWT Bearer e rate limiting (desabilitados por padrão);
 - testes unitários e de integração;
 - pipeline de restore, build, testes e cobertura;
-- imagem Docker da API.
+- imagem Docker da API e Docker Compose com MongoDB, RabbitMQ e API.
 
 ## Arquitetura
 
@@ -74,13 +75,15 @@ Fiscal-Flow/
 │   ├── FiscalFlow.Api/
 │   ├── FiscalFlow.Application/
 │   ├── FiscalFlow.Domain/
-│   └── FiscalFlow.Infrastructure/
+│   ├── FiscalFlow.Infrastructure/
+│   └── FiscalFlow.E2ETests/
 ├── tests/
 │   ├── FiscalFlow.UnitTests/
 │   └── FiscalFlow.IntegrationTests/
 ├── docs/
+├── requests/
 ├── .github/workflows/
-├── docker-compose.learning.yml
+├── docker-compose.yml
 └── FiscalFlow.slnx
 ```
 
@@ -92,16 +95,16 @@ Fiscal-Flow/
 | Domínio | C# e regras de negócio isoladas | Implementado |
 | Persistência | MongoDB + MongoDB.Driver | Implementado |
 | Mensageria | RabbitMQ | Implementado |
-| Jobs | Hangfire com storage MongoDB | Parcialmente concluído |
+| Jobs | Hangfire com storage MongoDB | Implementado (dashboard pendente) |
 | XML fiscal | APIs seguras de XML do .NET | Implementado |
 | Observabilidade | OpenTelemetry | Implementado |
 | Documentação da API | OpenAPI | Implementado |
-| Testes | xUnit e testes de integração | Implementado |
+| Testes | xUnit, integração e E2E inicial | Implementado |
 | CI | GitHub Actions | Implementado |
-| Container | Dockerfile da API | Implementado |
-| Autenticação | JWT Bearer | Próxima etapa |
-| Autorização | Políticas e tenant autenticado | Próxima etapa |
-| Rate limiting | ASP.NET Core Rate Limiting | Próxima etapa |
+| Container | Dockerfile e Docker Compose | Parcialmente concluído |
+| Autenticação | JWT Bearer | Implementado (opcional) |
+| Autorização | Política `fiscalflow-api` | Implementado (opcional) |
+| Rate limiting | ASP.NET Core Rate Limiting | Implementado (opcional) |
 
 ## Multi-tenancy
 
@@ -119,6 +122,8 @@ Exemplo de cabeçalho para o modo sem autenticação:
 X-Tenant-Id: empresa-a
 ```
 
+Com segurança habilitada, os endpoints fiscais exigem JWT Bearer com claims `sub` e `tenant_id`. Detalhes em [`docs/SECURITY.md`](docs/SECURITY.md).
+
 ## Idempotência
 
 A criação utiliza a combinação:
@@ -132,7 +137,8 @@ Comportamento:
 - primeira requisição: `201 Created` e `wasCreated: true`;
 - repetição: `200 OK` e `wasCreated: false`;
 - ambas retornam o mesmo documento;
-- o índice único do MongoDB protege cenários concorrentes.
+- o índice único do MongoDB protege cenários concorrentes;
+- documentos existentes em `Received` tentam republicar mensagem no RabbitMQ para recuperação após indisponibilidade do broker.
 
 ## Processamento assíncrono
 
@@ -145,7 +151,7 @@ API
 → atualiza para Processed ou Failed
 ```
 
-Mensagens repetidas não causam processamento duplicado. Falhas temporárias passam por retry e falhas irrecuperáveis seguem para a dead-letter queue.
+Mensagens repetidas não causam processamento duplicado. Falhas temporárias passam por retry e falhas irrecuperáveis seguem para a dead-letter queue. Jobs Hangfire reprocessam falhas e detectam documentos com tempo excedido em `Processing`.
 
 ## Endpoints principais
 
@@ -154,7 +160,8 @@ Mensagens repetidas não causam processamento duplicado. Falhas temporárias pas
 | `GET` | `/api/health` | Estado básico da aplicação |
 | `GET` | `/health/live` | Liveness probe |
 | `GET` | `/health/ready` | Readiness de dependências |
-| `POST` | `/api/fiscal-documents` | Cria ou retorna um documento existente |
+| `POST` | `/api/fiscal-documents` | Cria ou retorna um documento existente (JSON) |
+| `POST` | `/api/fiscal-documents/upload` | Cria ou retorna um documento existente (XML) |
 | `GET` | `/api/fiscal-documents` | Lista documentos do tenant |
 | `GET` | `/api/fiscal-documents/{id}` | Consulta um documento por ID |
 | `PATCH` | `/api/fiscal-documents/{id}/status` | Atualiza o status |
@@ -182,8 +189,13 @@ dotnet test FiscalFlow.slnx
 ### Subir dependências locais
 
 ```bash
-docker compose -f docker-compose.learning.yml up -d
+docker compose up -d mongodb rabbitmq
 ```
+
+Serviços disponíveis:
+
+- MongoDB: `localhost:27017`;
+- RabbitMQ: `localhost:5672` (management UI em `localhost:15672`, usuário e senha `fiscalflow`).
 
 ### Iniciar a API
 
@@ -191,7 +203,15 @@ docker compose -f docker-compose.learning.yml up -d
 dotnet run --project src/FiscalFlow.Api/FiscalFlow.Api.csproj --launch-profile http
 ```
 
-A configuração por ambiente está documentada em [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
+A API escuta em `http://localhost:5298`. A configuração por ambiente está documentada em [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
+
+### Subir stack completa com Docker
+
+```bash
+docker compose up -d --build
+```
+
+A API fica exposta em `http://localhost:8080`. Configure variáveis de ambiente para MongoDB e RabbitMQ conforme o ambiente de execução.
 
 ## Fluxo de desenvolvimento
 
@@ -214,7 +234,7 @@ Processo obrigatório:
 5. promover `tests` para `main` somente quando tudo estiver aprovado;
 6. sincronizar novamente `dev` e `tests` com a `main`.
 
-Nenhuma branch adicional é necessária para o fluxo atual.
+Detalhes adicionais em [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
 
 ## Integração contínua
 
@@ -228,14 +248,11 @@ A branch `tests` é o ambiente de validação antes da promoção para `main`. A
 
 ## Próximas etapas
 
-1. autenticação JWT;
-2. autorização e políticas de acesso;
-3. rate limiting;
-4. configuração segura de segredos;
-5. rotina de limpeza e proteção do dashboard Hangfire;
-6. Docker Compose completo;
-7. testes ponta a ponta;
-8. deploy e demonstração para portfólio.
+1. proteger e expor o dashboard Hangfire;
+2. rotina de limpeza de jobs Hangfire;
+3. completar configuração Docker para produção;
+4. ampliar testes ponta a ponta;
+5. deploy e demonstração para portfólio.
 
 O detalhamento está em [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -245,7 +262,12 @@ O detalhamento está em [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - [Referência da API](docs/API.md)
 - [Catálogo de endpoints](docs/ENDPOINTS.md)
 - [Configuração por ambiente](docs/CONFIGURATION.md)
+- [Segurança](docs/SECURITY.md)
+- [Observabilidade](docs/OBSERVABILITY.md)
 - [Respostas de erro](docs/ERROR_RESPONSES.md)
+- [Hangfire e timeout](docs/HANGFIRE_TIMEOUT.md)
+- [Correlation ID](docs/REQUEST_ID.md)
+- [Guia de desenvolvimento](docs/DEVELOPMENT.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Descrições para portfólio](docs/PROJECT-DESCRIPTIONS.md)
 
