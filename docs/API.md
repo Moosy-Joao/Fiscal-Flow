@@ -1,20 +1,39 @@
 # Referência da API
 
-Base local:
+Base local (perfil `http`):
 
 ```text
 http://localhost:5298
 ```
 
-## Tenant obrigatório
+Base Docker Compose:
 
-Todos os endpoints de documentos exigem:
-
-```http
-X-Tenant-Id: empresa-a
+```text
+http://localhost:8080
 ```
 
-O endpoint `/api/health` não exige tenant.
+## Tenant obrigatório
+
+Todos os endpoints de documentos exigem um tenant válido:
+
+- **Sem autenticação** (padrão local): cabeçalho `X-Tenant-Id`;
+- **Com autenticação** (`Security:Enabled=true`): claim `tenant_id` no JWT Bearer.
+
+Endpoints de saúde (`/api/health`, `/health/live`, `/health/ready`) não exigem tenant.
+
+## Correlation ID
+
+Todas as respostas incluem `X-Correlation-ID`. O cliente pode enviar o mesmo cabeçalho na requisição para rastrear a operação nos logs e no tracing. Detalhes em [`REQUEST_ID.md`](REQUEST_ID.md).
+
+## Autenticação (opcional)
+
+Com `Security:Enabled=true`, os endpoints fiscais exigem:
+
+```http
+Authorization: Bearer <token-jwt>
+```
+
+O token deve conter as claims `sub` e `tenant_id`. Detalhes em [`SECURITY.md`](SECURITY.md).
 
 ## Health
 
@@ -29,6 +48,14 @@ Resposta `200 OK`:
   "checkedAtUtc": "2026-06-20T00:00:00+00:00"
 }
 ```
+
+### `GET /health/live`
+
+Liveness probe. Confirma que o processo está em execução. Não verifica dependências externas.
+
+### `GET /health/ready`
+
+Readiness probe. Verifica MongoDB e, quando habilitado, RabbitMQ. Retorna `503` se alguma dependência obrigatória estiver indisponível.
 
 ## Criar documento com JSON
 
@@ -155,11 +182,19 @@ Resposta `200 OK`:
       "id": "2d218390-8fc0-44cb-9488-aa49b9187f81",
       "tenantId": "empresa-a",
       "externalDocumentId": "NFE-123",
-      "status": "Received",
+      "status": "Processed",
       "receivedAtUtc": "2026-06-20T00:00:00+00:00",
-      "processedAtUtc": null,
+      "processedAtUtc": "2026-06-20T00:00:05+00:00",
       "failureReason": null,
-      "fiscalData": null
+      "fiscalData": {
+        "accessKey": "35260612345678901234567890123456789012345678",
+        "issuerDocument": "12345678000199",
+        "issuerName": "Empresa Emissora LTDA",
+        "recipientDocument": "98765432000188",
+        "recipientName": "Empresa Destinatária LTDA",
+        "totalValue": 1500.00,
+        "issuedAt": "2026-06-19T14:30:00+00:00"
+      }
     }
   ],
   "page": 1,
@@ -167,6 +202,8 @@ Resposta `200 OK`:
   "totalItems": 1
 }
 ```
+
+O campo `fiscalData` é preenchido após processamento bem-sucedido do XML.
 
 ## Consultar por ID
 
@@ -183,7 +220,8 @@ Resultados:
 
 - `200 OK`: documento encontrado para o tenant;
 - `404 Not Found`: documento inexistente ou pertencente a outro tenant;
-- `400 Bad Request`: tenant ausente.
+- `400 Bad Request`: tenant ausente (modo anônimo);
+- `403 Forbidden`: token autenticado sem claim `tenant_id`.
 
 ## Atualizar status
 
@@ -221,6 +259,8 @@ Resultados:
 - `404 Not Found`: documento inexistente para o tenant;
 - `409 Conflict`: transição de status não permitida.
 
+> **Nota:** em operação normal, as transições de `Received` → `Processing` → `Processed`/`Failed` são executadas automaticamente pelo consumidor RabbitMQ. A atualização manual permanece disponível para testes e integrações controladas.
+
 ## Regras de status
 
 ```text
@@ -233,12 +273,23 @@ Failed → Processing
 
 `Processed` é terminal e não retorna para estados anteriores.
 
-## Erros de tenant
+## Erros comuns
 
-Sem o cabeçalho obrigatório, a API retorna `400 Bad Request` com `ProblemDetails`.
+| Situação | Status |
+|---|---|
+| Tenant ausente (anônimo) | `400 Bad Request` |
+| Token sem `tenant_id` | `403 Forbidden` |
+| Token ausente ou inválido (segurança habilitada) | `401 Unauthorized` |
+| Limite de requisições excedido | `429 Too Many Requests` |
+| Documento de outro tenant | `404 Not Found` |
+| Transição inválida | `409 Conflict` |
 
-Um tenant tentando acessar ou atualizar um documento de outro tenant recebe `404 Not Found`.
+Respostas de erro seguem `ProblemDetails` com `correlationId`. Detalhes em [`ERROR_RESPONSES.md`](ERROR_RESPONSES.md).
 
 ## OpenAPI
 
-Em ambiente de desenvolvimento, o documento OpenAPI é exposto pelo ASP.NET Core. A interface visual do Swagger ainda pode ser adicionada em uma etapa futura.
+Em ambiente de desenvolvimento, o documento OpenAPI é exposto em `/openapi/v1.json`. A interface visual do Swagger ainda pode ser adicionada em uma etapa futura.
+
+## Coleção de requisições
+
+Exemplos prontos para reprodução estão na pasta [`requests/`](../requests/).
