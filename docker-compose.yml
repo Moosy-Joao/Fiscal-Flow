@@ -1,25 +1,38 @@
 services:
+
   mongodb:
     image: mongo:8
     container_name: fiscalflow-mongodb
     restart: unless-stopped
+
     ports:
       - "27017:27017"
+
     volumes:
       - fiscalflow-mongodb-data:/data/db
+
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 15s
+      timeout: 10s
+      retries: 5
 
   rabbitmq:
     image: rabbitmq:4-management
     container_name: fiscalflow-rabbitmq
     restart: unless-stopped
+
     environment:
       RABBITMQ_DEFAULT_USER: fiscalflow
       RABBITMQ_DEFAULT_PASS: fiscalflow
+
     ports:
       - "5672:5672"
       - "15672:15672"
+
     volumes:
       - fiscalflow-rabbitmq-data:/var/lib/rabbitmq
+
     healthcheck:
       test:
         - CMD
@@ -30,6 +43,24 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+
+  api:
+    build:
+      context: .
+      dockerfile: src/FiscalFlow.Api/Dockerfile
+
+    container_name: fiscalflow-api
+    restart: unless-stopped
+
+    ports:
+      - "8080:8080"
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
 
 volumes:
   fiscalflow-mongodb-data:
